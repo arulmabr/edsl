@@ -9,13 +9,9 @@ import random
 from collections import UserList, defaultdict
 from typing import Optional, Callable, Any, Type, Union, List, TYPE_CHECKING
 
-if TYPE_CHECKING:
-    from edsl import Survey, Cache, AgentList, ModelList, ScenarioList
-    from edsl.results.Result import Result
-    from edsl.jobs.tasks.TaskHistory import TaskHistory
+from bisect import bisect_left
 
-from simpleeval import EvalWithCompoundTypes
-
+from edsl.Base import Base
 from edsl.exceptions.results import (
     ResultsError,
     ResultsBadMutationstringError,
@@ -26,25 +22,27 @@ from edsl.exceptions.results import (
     ResultsDeserializationError,
 )
 
+if TYPE_CHECKING:
+    from edsl.surveys.Survey import Survey
+    from edsl.data.Cache import Cache
+    from edsl.agents.AgentList import AgentList
+    from edsl.language_models.model import Model
+    from edsl.scenarios.ScenarioList import ScenarioList
+    from edsl.results.Result import Result
+    from edsl.jobs.tasks.TaskHistory import TaskHistory
+    from edsl.language_models.ModelList import ModelList
+    from simpleeval import EvalWithCompoundTypes
+
 from edsl.results.ResultsExportMixin import ResultsExportMixin
-from edsl.results.ResultsToolsMixin import ResultsToolsMixin
-
 from edsl.results.ResultsGGMixin import ResultsGGMixin
-from edsl.results.ResultsFetchMixin import ResultsFetchMixin
-
-from edsl.utilities.decorators import remove_edsl_version
-from edsl.utilities.utilities import dict_hash
-
-
-from edsl.Base import Base
+from edsl.results.results_fetch_mixin import ResultsFetchMixin
+from edsl.utilities.remove_edsl_version import remove_edsl_version
 
 
 class Mixins(
     ResultsExportMixin,
-    # ResultsDBMixin,
     ResultsFetchMixin,
     ResultsGGMixin,
-    # ResultsToolsMixin,
 ):
     def long(self):
         return self.table().long()
@@ -91,6 +89,7 @@ class Results(UserList, Mixins, Base):
         "question_type",
         "comment",
         "generated_tokens",
+        "cache_used",
     ]
 
     def __init__(
@@ -139,7 +138,33 @@ class Results(UserList, Mixins, Base):
         }
         return d
 
-    def compute_job_cost(self, include_cached_responses_in_cost=False) -> float:
+    def insert(self, item):
+        item_order = getattr(item, "order", None)
+        if item_order is not None:
+            # Get list of orders, putting None at the end
+            orders = [getattr(x, "order", None) for x in self]
+            # Filter to just the non-None orders for bisect
+            sorted_orders = [x for x in orders if x is not None]
+            if sorted_orders:
+                index = bisect_left(sorted_orders, item_order)
+                # Account for any None values before this position
+                index += orders[:index].count(None)
+            else:
+                # If no sorted items yet, insert before any unordered items
+                index = 0
+            self.data.insert(index, item)
+        else:
+            # No order - append to end
+            self.data.append(item)
+
+    def append(self, item):
+        self.insert(item)
+
+    def extend(self, other):
+        for item in other:
+            self.insert(item)
+
+    def compute_job_cost(self, include_cached_responses_in_cost: bool = False) -> float:
         """
         Computes the cost of a completed job in USD.
         """
@@ -253,24 +278,6 @@ class Results(UserList, Mixins, Base):
 
         raise TypeError("Invalid argument type")
 
-    def _update_results(self) -> None:
-        from edsl import Agent, Scenario
-        from edsl.language_models import LanguageModel
-        from edsl.results import Result
-
-        if self._job_uuid and len(self.data) < self._total_results:
-            results = [
-                Result(
-                    agent=Agent.from_dict(json.loads(r.agent)),
-                    scenario=Scenario.from_dict(json.loads(r.scenario)),
-                    model=LanguageModel.from_dict(json.loads(r.model)),
-                    iteration=1,
-                    answer=json.loads(r.answer),
-                )
-                for r in CRUD.read_results(self._job_uuid)
-            ]
-            self.data = results
-
     def __add__(self, other: Results) -> Results:
         """Add two Results objects together.
         They must have the same survey and created columns.
@@ -298,13 +305,10 @@ class Results(UserList, Mixins, Base):
         )
 
     def __repr__(self) -> str:
-        # import reprlib
-
         return f"Results(data = {self.data}, survey = {repr(self.survey)}, created_columns = {self.created_columns})"
 
     def table(
         self,
-        # selector_string: Optional[str] = "*.*",
         *fields,
         tablefmt: Optional[str] = None,
         pretty_labels: Optional[dict] = None,
@@ -343,10 +347,11 @@ class Results(UserList, Mixins, Base):
 
     def to_dict(
         self,
-        sort=False,
-        add_edsl_version=False,
-        include_cache=False,
-        include_task_history=False,
+        sort: bool = False,
+        add_edsl_version: bool = False,
+        include_cache: bool = False,
+        include_task_history: bool = False,
+        include_cache_info: bool = True,
     ) -> dict[str, Any]:
         from edsl.data.Cache import Cache
 
@@ -357,7 +362,11 @@ class Results(UserList, Mixins, Base):
 
         d = {
             "data": [
-                result.to_dict(add_edsl_version=add_edsl_version) for result in data
+                result.to_dict(
+                    add_edsl_version=add_edsl_version,
+                    include_cache_info=include_cache_info,
+                )
+                for result in data
             ],
             "survey": self.survey.to_dict(add_edsl_version=add_edsl_version),
             "created_columns": self.created_columns,
@@ -384,7 +393,7 @@ class Results(UserList, Mixins, Base):
 
         return d
 
-    def compare(self, other_results):
+    def compare(self, other_results: Results) -> dict:
         """
         Compare two Results objects and return the differences.
         """
@@ -402,11 +411,15 @@ class Results(UserList, Mixins, Base):
         }
 
     @property
-    def has_unfixed_exceptions(self):
+    def has_unfixed_exceptions(self) -> bool:
         return self.task_history.has_unfixed_exceptions
 
     def __hash__(self) -> int:
-        return dict_hash(self.to_dict(sort=True, add_edsl_version=False))
+        from edsl.utilities.utilities import dict_hash
+
+        return dict_hash(
+            self.to_dict(sort=True, add_edsl_version=False, include_cache_info=False)
+        )
 
     @property
     def hashes(self) -> set:
@@ -452,32 +465,35 @@ class Results(UserList, Mixins, Base):
         >>> r == r2
         True
         """
-        from edsl import Survey, Cache
+        from edsl.surveys.Survey import Survey
+        from edsl.data.Cache import Cache
         from edsl.results.Result import Result
         from edsl.jobs.tasks.TaskHistory import TaskHistory
+        from edsl.agents.Agent import Agent
+
+        survey = Survey.from_dict(data["survey"])
+        results_data = [Result.from_dict(r) for r in data["data"]]
+        created_columns = data.get("created_columns", None)
+        cache = Cache.from_dict(data.get("cache")) if "cache" in data else Cache()
+        task_history = (
+            TaskHistory.from_dict(data.get("task_history"))
+            if "task_history" in data
+            else TaskHistory(interviews=[])
+        )
+        params = {
+            "survey": survey,
+            "data": results_data,
+            "created_columns": created_columns,
+            "cache": cache,
+            "task_history": task_history,
+        }
 
         try:
-            results = cls(
-                survey=Survey.from_dict(data["survey"]),
-                data=[Result.from_dict(r) for r in data["data"]],
-                created_columns=data.get("created_columns", None),
-                cache=(
-                    Cache.from_dict(data.get("cache")) if "cache" in data else Cache()
-                ),
-                task_history=(
-                    TaskHistory.from_dict(data.get("task_history"))
-                    if "task_history" in data
-                    else TaskHistory(interviews=[])
-                ),
-            )
+            results = cls(**params)
         except Exception as e:
             raise ResultsDeserializationError(f"Error in Results.from_dict: {e}")
         return results
 
-    ######################
-    ## Convenience methods
-    ## & Report methods
-    ######################
     @property
     def _key_to_data_type(self) -> dict[str, str]:
         """
@@ -549,7 +565,7 @@ class Results(UserList, Mixins, Base):
         answer_keys = self._data_type_to_keys["answer"]
         answer_keys = {k for k in answer_keys if "_comment" not in k}
         questions_text = [
-            self.survey.get_question(k).question_text for k in answer_keys
+            self.survey._get_question_by_name(k).question_text for k in answer_keys
         ]
         short_question_text = [shorten_string(q, 80) for q in questions_text]
         initial_dict = dict(zip(answer_keys, short_question_text))
@@ -566,7 +582,7 @@ class Results(UserList, Mixins, Base):
         >>> r.agents
         AgentList([Agent(traits = {'status': 'Joyful'}), Agent(traits = {'status': 'Joyful'}), Agent(traits = {'status': 'Sad'}), Agent(traits = {'status': 'Sad'})])
         """
-        from edsl import AgentList
+        from edsl.agents.AgentList import AgentList
 
         return AgentList([r.agent for r in self.data])
 
@@ -580,9 +596,12 @@ class Results(UserList, Mixins, Base):
         >>> r.models[0]
         Model(model_name = ...)
         """
-        from edsl import ModelList
+        from edsl.language_models.ModelList import ModelList
 
         return ModelList([r.model for r in self.data])
+
+    def __eq__(self, other):
+        return hash(self) == hash(other)
 
     @property
     def scenarios(self) -> ScenarioList:
@@ -592,9 +611,9 @@ class Results(UserList, Mixins, Base):
 
         >>> r = Results.example()
         >>> r.scenarios
-        ScenarioList([Scenario({'period': 'morning'}), Scenario({'period': 'afternoon'}), Scenario({'period': 'morning'}), Scenario({'period': 'afternoon'})])
+        ScenarioList([Scenario({'period': 'morning', 'scenario_index': 0}), Scenario({'period': 'afternoon', 'scenario_index': 1}), Scenario({'period': 'morning', 'scenario_index': 0}), Scenario({'period': 'afternoon', 'scenario_index': 1})])
         """
-        from edsl import ScenarioList
+        from edsl.scenarios.ScenarioList import ScenarioList
 
         return ScenarioList([r.scenario for r in self.data])
 
@@ -673,13 +692,19 @@ class Results(UserList, Mixins, Base):
         """
         return self.data[0]
 
-    def answer_truncate(self, column: str, top_n=5, new_var_name=None) -> Results:
+    def answer_truncate(
+        self, column: str, top_n: int = 5, new_var_name: str = None
+    ) -> Results:
         """Create a new variable that truncates the answers to the top_n.
 
         :param column: The column to truncate.
         :param top_n: The number of top answers to keep.
         :param new_var_name: The name of the new variable. If None, it is the original name + '_truncated'.
 
+        Example:
+        >>> r = Results.example()
+        >>> r.answer_truncate('how_feeling', top_n = 2).select('how_feeling', 'how_feeling_truncated')
+        Dataset([{'answer.how_feeling': ['OK', 'Great', 'Terrible', 'OK']}, {'answer.how_feeling_truncated': ['Other', 'Other', 'Other', 'Other']}])
 
 
         """
@@ -759,7 +784,7 @@ class Results(UserList, Mixins, Base):
     @staticmethod
     def _create_evaluator(
         result: Result, functions_dict: Optional[dict] = None
-    ) -> EvalWithCompoundTypes:
+    ) -> "EvalWithCompoundTypes":
         """Create an evaluator for the expression.
 
         >>> from unittest.mock import Mock
@@ -782,6 +807,8 @@ class Results(UserList, Mixins, Base):
         ...
         simpleeval.NameNotDefined: 'how_feeling' is not defined for expression 'how_feeling== 'OK''
         """
+        from simpleeval import EvalWithCompoundTypes
+
         if functions_dict is None:
             functions_dict = {}
         evaluator = EvalWithCompoundTypes(
@@ -898,7 +925,7 @@ class Results(UserList, Mixins, Base):
         n: Optional[int] = None,
         frac: Optional[float] = None,
         with_replacement: bool = True,
-        seed: Optional[str] = "edsl",
+        seed: Optional[str] = None,
     ) -> Results:
         """Sample the results.
 
@@ -913,7 +940,7 @@ class Results(UserList, Mixins, Base):
         >>> len(r.sample(2))
         2
         """
-        if seed != "edsl":
+        if seed:
             random.seed(seed)
 
         if n is None and frac is None:
@@ -951,7 +978,7 @@ class Results(UserList, Mixins, Base):
         Dataset([{'answer.how_feeling_yesterday': ['Great', 'Good', 'OK', 'Terrible']}])
         """
 
-        from edsl.results.Selector import Selector
+        from edsl.results.results_selector import Selector
 
         if len(self) == 0:
             raise Exception("No data to select from---the Results object is empty.")
@@ -966,6 +993,7 @@ class Results(UserList, Mixins, Base):
         return selector.select(*columns)
 
     def sort_by(self, *columns: str, reverse: bool = False) -> Results:
+        """Sort the results by one or more columns."""
         import warnings
 
         warnings.warn(
@@ -974,6 +1002,7 @@ class Results(UserList, Mixins, Base):
         return self.order_by(*columns, reverse=reverse)
 
     def _parse_column(self, column: str) -> tuple[str, str]:
+        """Parse a column name into a data type and key."""
         if "." in column:
             return column.split(".")
         return self._key_to_data_type[column], column
@@ -1152,17 +1181,3 @@ if __name__ == "__main__":
     import doctest
 
     doctest.testmod(optionflags=doctest.ELLIPSIS)
-
-    from edsl import Results
-    from edsl.results.Result import Result
-    from edsl.agents.Agent import Agent
-    from edsl import Scenario
-    from edsl import Model
-    from edsl.language_models.LanguageModel import LanguageModel
-    from edsl.prompts.Prompt import Prompt
-    from edsl.surveys.Survey import Survey
-    from edsl import Question
-    from edsl.surveys.RuleCollection import RuleCollection
-    from edsl.surveys.Rule import Rule
-
-    assert eval(repr(Results.example())) == Results.example()

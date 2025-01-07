@@ -3,12 +3,19 @@
 Credits
 =======
 
-Credits are required in order to access certain features of the Expected Parrot server, such as running your surveys remotely using your Expected Parrot API key.
+Credits are required in order to `run your surveys remotely <https://docs.expectedparrot.com/en/latest/remote_inference.html>`_ at the Expected Parrot server and to access certain other special features of Coop.
+They are available for purchase at your `Coop account <https://www.expectedparrot.com/login>`_ (details below).
+Credits are *not* required in order to run your surveys locally on your own machine (by storing your own :ref:`api_keys` for service providers), or to `post and share content at the Coop <https://www.expectedparrot.com/content/explore>`_ that you have created.
+
 When you use remote inference, credits are deducted from your balance to cover the costs of API calls to language model service providers, which are based on token rates set by providers.
 A list of token rates for different models available with remote inference can be found on the `Pricing <https://www.expectedparrot.com/getting-started/coop-pricing>`_ page.
 Details on how credits are consumed are provided below. 
 Credits must be purchased in advance and are consumed when surveys are run. 
 If you do not have enough credits to run a survey, you will be prompted to purchase more credits.
+
+*Note: We are adding new features for storing your own API keys for service providers at your Coop account in order to use them with remote inference.*
+*This page will be updated with details.* 
+*If you are interested in testing these and other new features, please send us a message at info@expectedparrot.com and we will activate beta features and add credits to your Coop account!*
 
 
 Free credits
@@ -93,87 +100,39 @@ For example, here we run a question with two models and inspect the raw model re
 
     results = q.by(m).run()
 
-    results.select("model", "raw_model_response.*").print(format="rich")
+    results.select("model", "raw_model_response.*")
 
 
 Output:
 
-.. code-block:: text
+.. list-table::
+   :header-rows: 1
 
-    ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
-    ┃ model                      ┃ raw_model_response    ┃ raw_model_response    ┃ raw_model_response                 ┃
-    ┃ .model                     ┃ .rainbow_cost         ┃ .rainbow_one_usd_buys ┃ .rainbow_raw_model_response        ┃
-    ┡━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
-    │ gpt-4o                     │ 0.00049               │ 2040.8163265306123    │ {'id':                             │
-    │                            │                       │                       │ 'chatcmpl-APzmU9EKGX4tHk9K685CDJf… │
-    │                            │                       │                       │ 'choices': [{'finish_reason':      │
-    │                            │                       │                       │ 'stop', 'index': 0, 'logprobs':    │
-    │                            │                       │                       │ None, 'message': {'content': 'A    │
-    │                            │                       │                       │ rainbow consists of seven colors,  │
-    │                            │                       │                       │ which are typically listed in the  │
-    │                            │                       │                       │ following order: red, orange,      │
-    │                            │                       │                       │ yellow, green, blue, indigo, and   │
-    │                            │                       │                       │ violet. These colors can be        │
-    │                            │                       │                       │ remembered using the acronym       │
-    │                            │                       │                       │ "ROYGBIV."', 'refusal': None,      │
-    │                            │                       │                       │ 'role': 'assistant', 'audio':      │
-    │                            │                       │                       │ None, 'function_call': None,       │
-    │                            │                       │                       │ 'tool_calls': None}}], 'created':  │
-    │                            │                       │                       │ 1730759050, 'model':               │
-    │                            │                       │                       │ 'gpt-4o-2024-08-06', 'object':     │
-    │                            │                       │                       │ 'chat.completion', 'service_tier': │
-    │                            │                       │                       │ None, 'system_fingerprint':        │
-    │                            │                       │                       │ 'fp_159d8341cc', 'usage':          │
-    │                            │                       │                       │ {'completion_tokens': 45,          │
-    │                            │                       │                       │ 'prompt_tokens': 16,               │
-    │                            │                       │                       │ 'total_tokens': 61,                │
-    │                            │                       │                       │ 'completion_tokens_details':       │
-    │                            │                       │                       │ {'audio_tokens': None,             │
-    │                            │                       │                       │ 'reasoning_tokens': 0,             │
-    │                            │                       │                       │ 'accepted_prediction_tokens': 0,   │
-    │                            │                       │                       │ 'rejected_prediction_tokens': 0},  │
-    │                            │                       │                       │ 'prompt_tokens_details':           │
-    │                            │                       │                       │ {'audio_tokens': None,             │
-    │                            │                       │                       │ 'cached_tokens': 0}}}              │
-    ├────────────────────────────┼───────────────────────┼───────────────────────┼────────────────────────────────────┤
-    │ claude-3-5-sonnet-20240620 │ 0.0030179850540744415 │ 331.34690267930466    │ {'id':                             │
-    │                            │                       │                       │ 'msg_01NpHrKNg3AqnNSBRyEV4kwy',    │
-    │                            │                       │                       │ 'content': [{'text': 'The colors   │
-    │                            │                       │                       │ of a rainbow are typically         │
-    │                            │                       │                       │ described as having seven distinct │
-    │                            │                       │                       │ hues, often remembered by the      │
-    │                            │                       │                       │ mnemonic device "ROY G. BIV."      │
-    │                            │                       │                       │ These colors are, in order:\n\n1.  │
-    │                            │                       │                       │ Red\n2. Orange\n3. Yellow\n4.      │
-    │                            │                       │                       │ Green\n5. Blue\n6. Indigo\n7.      │
-    │                            │                       │                       │ Violet\n\nIt\'s worth noting       │
-    │                            │                       │                       │ that:\n\n1. In reality, a rainbow  │
-    │                            │                       │                       │ is a continuous spectrum of        │
-    │                            │                       │                       │ colors, and these seven colors are │
-    │                            │                       │                       │ somewhat arbitrarily               │
-    │                            │                       │                       │ divided.\n\n2. Some people         │
-    │                            │                       │                       │ consider indigo to be a subset of  │
-    │                            │                       │                       │ blue and don\'t always include it  │
-    │                            │                       │                       │ as a separate color, reducing the  │
-    │                            │                       │                       │ count to six main colors.\n\n3.    │
-    │                            │                       │                       │ The colors can vary slightly in    │
-    │                            │                       │                       │ appearance depending on            │
-    │                            │                       │                       │ atmospheric conditions and the     │
-    │                            │                       │                       │ observer\'s perspective.\n\n4.     │
-    │                            │                       │                       │ Beyond the visible spectrum,       │
-    │                            │                       │                       │ rainbows also contain ultraviolet  │
-    │                            │                       │                       │ light (beyond violet) and infrared │
-    │                            │                       │                       │ light (beyond red), which are not  │
-    │                            │                       │                       │ visible to the human eye.',        │
-    │                            │                       │                       │ 'type': 'text'}], 'model':         │
-    │                            │                       │                       │ 'claude-3-5-sonnet-20240620',      │
-    │                            │                       │                       │ 'role': 'assistant',               │
-    │                            │                       │                       │ 'stop_reason': 'end_turn',         │
-    │                            │                       │                       │ 'stop_sequence': None, 'type':     │
-    │                            │                       │                       │ 'message', 'usage':                │
-    │                            │                       │                       │ {'input_tokens': 16,               │
-    │                            │                       │                       │ 'output_tokens': 198}}             │
-    └────────────────────────────┴───────────────────────┴───────────────────────┴────────────────────────────────────┘
+   * - model.model
+     - raw_model_response.rainbow_cost
+     - raw_model_response.rainbow_one_usd_buys
+     - raw_model_response.rainbow_raw_model_response
+   * - gpt-4o
+     - 0.00049
+     - 2040.8163265306123
+     - {'id': 'chatcmpl-APzmU9EKGX4tHk9K685CDJf...', 
+        'choices': [{'finish_reason': 'stop', 'index': 0, 'logprobs': None, 
+        'message': {'content': 'A rainbow consists of seven colors, which are typically listed in the following order: red, orange, yellow, green, blue, indigo, and violet. These colors can be remembered using the acronym "ROYGBIV."',
+        'refusal': None, 'role': 'assistant', 'audio': None, 'function_call': None, 'tool_calls': None}}],
+        'created': 1730759050, 'model': 'gpt-4o-2024-08-06', 'object': 'chat.completion', 
+        'service_tier': None, 'system_fingerprint': 'fp_159d8341cc', 
+        'usage': {'completion_tokens': 45, 'prompt_tokens': 16, 'total_tokens': 61, 
+        'completion_tokens_details': {'audio_tokens': None, 'reasoning_tokens': 0, 
+        'accepted_prediction_tokens': 0, 'rejected_prediction_tokens': 0}, 
+        'prompt_tokens_details': {'audio_tokens': None, 'cached_tokens': 0}}}
+   * - claude-3-5-sonnet-20240620
+     - 0.0030179850540744415
+     - 331.34690267930466
+     - {'id': 'msg_01NpHrKNg3AqnNSBRyEV4kwy', 
+        'content': [{'text': 'The colors of a rainbow are typically described as having seven distinct hues, often remembered by the mnemonic device "ROY G. BIV." These colors are, in order:\n\n1. Red\n2. Orange\n3. Yellow\n4. Green\n5. Blue\n6. Indigo\n7. Violet\n\nIt\'s worth noting that:\n\n1. In reality, a rainbow is a continuous spectrum of colors, and these seven colors are somewhat arbitrarily divided.\n\n2. Some people consider indigo to be a subset of blue and don\'t always include it as a separate color, reducing the count to six main colors.\n\n3. The colors can vary slightly in appearance depending on atmospheric conditions and the observer\'s perspective.\n\n4. Beyond the visible spectrum, rainbows also contain ultraviolet light (beyond violet) and infrared light (beyond red), which are not visible to the human eye.',
+        'type': 'text'}], 'model': 'claude-3-5-sonnet-20240620', 'role': 'assistant', 
+        'stop_reason': 'end_turn', 'stop_sequence': None, 'type': 'message', 
+        'usage': {'input_tokens': 16, 'output_tokens': 198}}
 
 
 In the raw model response information for the response from *gpt-4o*, we can see values for `completion_tokens` (output tokens) and `prompt_tokens` (input tokens):
@@ -371,19 +330,17 @@ We can call the `show_prompts()` method on the job object to see the prompts for
 
 Output:
 
-.. code-block:: text
+.. list-table::
+   :header-rows: 1
 
-    ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
-    ┃ user_prompt                               ┃ system_prompt                                                       ┃
-    ┡━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
-    │ What is the name of your favorite flower? │ You are answering questions as if you were a human. Do not break    │
-    │                                           │ character. Your traits: {'persona': 'You are a botanist on Cape     │
-    │                                           │ Cod.'}                                                              │
-    ├───────────────────────────────────────────┼─────────────────────────────────────────────────────────────────────┤
-    │ What color is {{ answer }}?               │ You are answering questions as if you were a human. Do not break    │
-    │                                           │ character. Your traits: {'persona': 'You are a botanist on Cape     │
-    │                                           │ Cod.'}                                                              │
-    └───────────────────────────────────────────┴─────────────────────────────────────────────────────────────────────┘
+   * - user_prompt
+     - system_prompt
+   * - What is the name of your favorite flower?
+     - You are answering questions as if you were a human. Do not break character.  
+       Your traits: {'persona': 'You are a botanist on Cape Cod.'}
+   * - What color is {{ answer }}?
+     - You are answering questions as if you were a human. Do not break character.  
+       Your traits: {'persona': 'You are a botanist on Cape Cod.'}
 
 
 Here we count the characters in each user prompt and system prompt:

@@ -1,5 +1,14 @@
 import pytest
-from edsl import Coop, Agent, Jobs, Model, Results, Survey
+
+# from edsl import Coop, Agent, Jobs, Model, Results, Survey
+
+from edsl.agents.Agent import Agent
+from edsl.coop.coop import Coop
+from edsl.jobs.Jobs import Jobs
+from edsl.language_models.model import Model
+from edsl.results.Results import Results
+from edsl.surveys.Survey import Survey
+
 from edsl.questions import (
     QuestionMultipleChoice,
     QuestionLikertFive,
@@ -14,7 +23,7 @@ def test_coop_remote_inference_cost():
     coop = Coop(api_key="b")
     job = Jobs.example()
     cost = coop.remote_inference_cost(job)
-    assert cost == {"credits": 0.77, "usd": 0.0076950000000000005}
+    assert cost == {"credits": 0.77, "usd": 0.007670000000000001}
     survey = Survey(
         questions=[
             QuestionMultipleChoice.example(),

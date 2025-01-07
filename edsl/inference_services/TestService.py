@@ -2,7 +2,7 @@ from typing import Any, List, Optional
 import os
 import asyncio
 from edsl.inference_services.InferenceServiceABC import InferenceServiceABC
-from edsl.language_models import LanguageModel
+from edsl.language_models.LanguageModel import LanguageModel
 from edsl.inference_services.rate_limits_cache import rate_limits
 from edsl.utilities.utilities import fix_partial_correct_response
 
@@ -51,6 +51,7 @@ class TestService(InferenceServiceABC):
             @property
             def _canned_response(self):
                 if hasattr(self, "canned_response"):
+
                     return self.canned_response
                 else:
                     return "Hello, world"
@@ -63,15 +64,6 @@ class TestService(InferenceServiceABC):
                 files_list: Optional[List["File"]] = None,
             ) -> dict[str, Any]:
                 await asyncio.sleep(0.1)
-                # return {"message": """{"answer": "Hello, world"}"""}
-
-                if hasattr(self, "func"):
-                    return {
-                        "message": [
-                            {"text": self.func(user_prompt, system_prompt, files_list)}
-                        ],
-                        "usage": {"prompt_tokens": 1, "completion_tokens": 1},
-                    }
 
                 if hasattr(self, "throw_exception") and self.throw_exception:
                     if hasattr(self, "exception_probability"):
@@ -81,6 +73,15 @@ class TestService(InferenceServiceABC):
 
                     if random.random() < p:
                         raise Exception("This is a test error")
+
+                if hasattr(self, "func"):
+                    return {
+                        "message": [
+                            {"text": self.func(user_prompt, system_prompt, files_list)}
+                        ],
+                        "usage": {"prompt_tokens": 1, "completion_tokens": 1},
+                    }
+
                 return {
                     "message": [{"text": f"{self._canned_response}"}],
                     "usage": {"prompt_tokens": 1, "completion_tokens": 1},

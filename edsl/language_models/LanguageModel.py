@@ -21,7 +21,6 @@ import os
 from typing import (
     Coroutine,
     Any,
-    Callable,
     Type,
     Union,
     List,
@@ -31,8 +30,6 @@ from typing import (
     TYPE_CHECKING,
 )
 from abc import ABC, abstractmethod
-
-from json_repair import repair_json
 
 from edsl.data_transfer_models import (
     ModelResponse,
@@ -45,13 +42,15 @@ if TYPE_CHECKING:
     from edsl.data.Cache import Cache
     from edsl.scenarios.FileStore import FileStore
     from edsl.questions.QuestionBase import QuestionBase
+    from edsl.language_models.key_management.KeyLookup import KeyLookup
 
-from edsl.config import CONFIG
+from edsl.enums import InferenceServiceType
+
 from edsl.utilities.decorators import (
     sync_wrapper,
     jupyter_nb_handler,
-    remove_edsl_version,
 )
+from edsl.utilities.remove_edsl_version import remove_edsl_version
 
 from edsl.Base import PersistenceMixin, RepresentationMixin
 from edsl.language_models.RegisterLanguageModelsMeta import RegisterLanguageModelsMeta
@@ -59,10 +58,6 @@ from edsl.language_models.RegisterLanguageModelsMeta import RegisterLanguageMode
 from edsl.language_models.key_management.KeyLookupCollection import (
     KeyLookupCollection,
 )
-from edsl.language_models.key_management.KeyLookup import KeyLookup
-from edsl.language_models.PriceManager import PriceManager
-
-TIMEOUT = float(CONFIG.get("EDSL_API_TIMEOUT"))
 
 from edsl.language_models.RawResponseHandler import RawResponseHandler
 
@@ -106,8 +101,6 @@ class LanguageModel(
     key_sequence = (
         None  # This should be something like ["choices", 0, "message", "content"]
     )
-    __rate_limits = None
-    _safety_factor = 0.8
 
     DEFAULT_RPM = 100
     DEFAULT_TPM = 1000
@@ -120,10 +113,10 @@ class LanguageModel(
 
     def __init__(
         self,
-        tpm: float = None,
-        rpm: float = None,
+        tpm: Optional[float] = None,
+        rpm: Optional[float] = None,
         omit_system_prompt_if_empty_string: bool = True,
-        key_lookup: Optional[KeyLookup] = None,
+        key_lookup: Optional["KeyLookup"] = None,
         **kwargs,
     ):
         """Initialize the LanguageModel."""
@@ -133,8 +126,6 @@ class LanguageModel(
         self.parameters = parameters
         self.remote = False
         self.omit_system_prompt_if_empty = omit_system_prompt_if_empty_string
-
-        # self.raw_response_handler = RawResponseHandler(self.key_sequence)
 
         self.key_lookup = self._set_key_lookup(key_lookup)
         self.model_info = self.key_lookup.get(self._inference_service_)
@@ -152,16 +143,12 @@ class LanguageModel(
             if key not in parameters:
                 setattr(self, key, value)
 
-        if "use_cache" in kwargs:
-            warnings.warn(
-                "The use_cache parameter is deprecated. Use the Cache class instead."
-            )
-
         if kwargs.get("skip_api_key_check", False):
             # Skip the API key check. Sometimes this is useful for testing.
             self._api_token = None
 
-    def _set_key_lookup(self, key_lookup: KeyLookup) -> "KeyLookup":
+    def _set_key_lookup(self, key_lookup: "KeyLookup") -> "KeyLookup":
+        """Set the key lookup."""
         if key_lookup is not None:
             return key_lookup
         else:
@@ -169,14 +156,20 @@ class LanguageModel(
             klc.add_key_lookup(fetch_order=("config", "env"))
             return klc.get(("config", "env"))
 
-    def ask_question(self, question):
+    def set_key_lookup(self, key_lookup: "KeyLookup") -> None:
+        """Set the key lookup, later"""
+        if hasattr(self, "_api_token"):
+            del self._api_token
+        self.key_lookup = key_lookup
+
+    def ask_question(self, question: "QuestionBase") -> str:
+        """Ask a question and return the response.
+
+        :param question: The question to ask.
+        """
         user_prompt = question.get_instructions().render(question.data).text
         system_prompt = "You are a helpful agent pretending to be a human."
         return self.execute_model_call(user_prompt, system_prompt)
-
-    def set_key_lookup(self, key_lookup: "KeyLookup") -> None:
-        del self._api_token
-        self.key_lookup = key_lookup
 
     @property
     def rpm(self):
@@ -247,7 +240,12 @@ class LanguageModel(
         return key_value is not None
 
     def __hash__(self) -> str:
-        """Allow the model to be used as a key in a dictionary."""
+        """Allow the model to be used as a key in a dictionary.
+
+        >>> m = LanguageModel.example()
+        >>> hash(m)
+        1811901442659237949
+        """
         from edsl.utilities.utilities import dict_hash
 
         return dict_hash(self.to_dict(add_edsl_version=False))
@@ -285,16 +283,7 @@ class LanguageModel(
 
     @abstractmethod
     async def async_execute_model_call(user_prompt: str, system_prompt: str):
-        """Execute the model call and returns a coroutine.
-
-        >>> m = LanguageModel.example(test_model = True)
-        >>> async def test(): return await m.async_execute_model_call("Hello, model!", "You are a helpful agent.")
-        >>> asyncio.run(test())
-        {'message': [{'text': 'Hello world'}], ...}
-
-        >>> m.execute_model_call("Hello, model!", "You are a helpful agent.")
-        {'message': [{'text': 'Hello world'}], ...}
-        """
+        """Execute the model call and returns a coroutine."""
         pass
 
     async def remote_async_execute_model_call(
@@ -311,12 +300,7 @@ class LanguageModel(
 
     @jupyter_nb_handler
     def execute_model_call(self, *args, **kwargs) -> Coroutine:
-        """Execute the model call and returns the result as a coroutine.
-
-        >>> m = LanguageModel.example(test_model = True)
-        >>> m.execute_model_call(user_prompt = "Hello, model!", system_prompt = "You are a helpful agent.")
-
-        """
+        """Execute the model call and returns the result as a coroutine."""
 
         async def main():
             results = await asyncio.gather(
@@ -328,7 +312,14 @@ class LanguageModel(
 
     @classmethod
     def get_generated_token_string(cls, raw_response: dict[str, Any]) -> str:
-        """Return the generated token string from the raw response."""
+        """Return the generated token string from the raw response.
+
+        >>> m = LanguageModel.example(test_model = True)
+        >>> raw_response = m.execute_model_call("Hello, model!", "You are a helpful agent.")
+        >>> m.get_generated_token_string(raw_response)
+        'Hello world'
+
+        """
         return cls.response_handler.get_generated_token_string(raw_response)
 
     @classmethod
@@ -356,6 +347,8 @@ class LanguageModel(
         :param system_prompt: The system's prompt.
         :param iteration: The iteration number.
         :param cache: The cache to use.
+        :param files_list: The list of files to use.
+        :param invigilator: The invigilator to use.
 
         If the cache isn't being used, it just returns a 'fresh' call to the LLM.
         But if cache is being used, it first checks the database to see if the response is already there.
@@ -398,6 +391,10 @@ class LanguageModel(
                 "system_prompt": system_prompt,
                 "files_list": files_list,
             }
+            from edsl.config import CONFIG
+
+            TIMEOUT = float(CONFIG.get("EDSL_API_TIMEOUT"))
+
             response = await asyncio.wait_for(f(**params), timeout=TIMEOUT)
             new_cache_key = cache.store(
                 **cache_call_params, response=response
@@ -443,9 +440,9 @@ class LanguageModel(
 
         :param user_prompt: The user's prompt.
         :param system_prompt: The system's prompt.
-        :param iteration: The iteration number.
         :param cache: The cache to use.
-        :param encoded_image: The encoded image to use.
+        :param iteration: The iteration number.
+        :param files_list: The list of files to use.
 
         """
         params = {
@@ -459,8 +456,11 @@ class LanguageModel(
             params.update({"invigilator": kwargs["invigilator"]})
 
         model_inputs = ModelInputs(user_prompt=user_prompt, system_prompt=system_prompt)
-        model_outputs = await self._async_get_intended_model_call_outcome(**params)
-        edsl_dict = self.parse_response(model_outputs.response)
+        model_outputs: ModelResponse = (
+            await self._async_get_intended_model_call_outcome(**params)
+        )
+        edsl_dict: EDSLOutput = self.parse_response(model_outputs.response)
+
         agent_response_dict = AgentResponseDict(
             model_inputs=model_inputs,
             model_outputs=model_outputs,
@@ -471,9 +471,13 @@ class LanguageModel(
     get_response = sync_wrapper(async_get_response)
 
     def cost(self, raw_response: dict[str, Any]) -> Union[float, str]:
-        """Return the dollar cost of a raw response."""
+        """Return the dollar cost of a raw response.
+
+        :param raw_response: The raw response from the model.
+        """
 
         usage = self.get_usage_dict(raw_response)
+        from edsl.language_models.PriceManager import PriceManager
 
         price_manger = PriceManager()
         return price_manger.calculate_cost(
@@ -487,11 +491,16 @@ class LanguageModel(
     def to_dict(self, add_edsl_version: bool = True) -> dict[str, Any]:
         """Convert instance to a dictionary
 
+        :param add_edsl_version: Whether to add the EDSL version to the dictionary.
+
         >>> m = LanguageModel.example()
         >>> m.to_dict()
         {'model': '...', 'parameters': {'temperature': ..., 'max_tokens': ..., 'top_p': ..., 'frequency_penalty': ..., 'presence_penalty': ..., 'logprobs': False, 'top_logprobs': ...}, 'edsl_version': '...', 'edsl_class_name': 'LanguageModel'}
         """
-        d = {"model": self.model, "parameters": self.parameters}
+        d = {
+            "model": self.model,
+            "parameters": self.parameters,
+        }
         if add_edsl_version:
             from edsl import __version__
 
@@ -503,13 +512,13 @@ class LanguageModel(
     @remove_edsl_version
     def from_dict(cls, data: dict) -> Type[LanguageModel]:
         """Convert dictionary to a LanguageModel child instance."""
-        from edsl.language_models.registry import get_model_class
+        from edsl.language_models.model import get_model_class
 
         model_class = get_model_class(data["model"])
         return model_class(**data)
 
     def __repr__(self) -> str:
-        """Return a string representation of the object."""
+        """Return a representation of the object."""
         param_string = ", ".join(
             f"{key} = {value}" for key, value in self.parameters.items()
         )
@@ -551,7 +560,7 @@ class LanguageModel(
         Exception report saved to ...
         Also see: ...
         """
-        from edsl import Model
+        from edsl.language_models.model import Model
 
         if test_model:
             m = Model(
@@ -560,6 +569,54 @@ class LanguageModel(
             return m
         else:
             return Model(skip_api_key_check=True)
+
+    def from_cache(self, cache: "Cache") -> LanguageModel:
+
+        from copy import deepcopy
+        from types import MethodType
+        from edsl import Cache
+
+        new_instance = deepcopy(self)
+        print("Cache entries", len(cache))
+        new_instance.cache = Cache(
+            data={k: v for k, v in cache.items() if v.model == self.model}
+        )
+        print("Cache entries with same model", len(new_instance.cache))
+
+        new_instance.user_prompts = [
+            ce.user_prompt for ce in new_instance.cache.values()
+        ]
+        new_instance.system_prompts = [
+            ce.system_prompt for ce in new_instance.cache.values()
+        ]
+
+        async def async_execute_model_call(self, user_prompt: str, system_prompt: str):
+            cache_call_params = {
+                "model": str(self.model),
+                "parameters": self.parameters,
+                "system_prompt": system_prompt,
+                "user_prompt": user_prompt,
+                "iteration": 1,
+            }
+            cached_response, cache_key = cache.fetch(**cache_call_params)
+            response = json.loads(cached_response)
+            cost = 0
+            return ModelResponse(
+                response=response,
+                cache_used=True,
+                cache_key=cache_key,
+                cached_response=cached_response,
+                cost=cost,
+            )
+
+        # Bind the new method to the copied instance
+        setattr(
+            new_instance,
+            "async_execute_model_call",
+            MethodType(async_execute_model_call, new_instance),
+        )
+
+        return new_instance
 
 
 if __name__ == "__main__":

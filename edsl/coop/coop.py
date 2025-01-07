@@ -1,11 +1,19 @@
 import aiohttp
 import json
-import os
 import requests
-from typing import Any, Optional, Union, Literal
+
+from typing import Any, Optional, Union, Literal, TypedDict
 from uuid import UUID
+from collections import UserDict, defaultdict
+
 import edsl
-from edsl import CONFIG, CacheEntry, Jobs, Survey
+from pathlib import Path
+
+from edsl.config import CONFIG
+from edsl.data.CacheEntry import CacheEntry
+from edsl.jobs.Jobs import Jobs
+from edsl.surveys.Survey import Survey
+
 from edsl.exceptions.coop import CoopNoUUIDError, CoopServerResponseError
 from edsl.coop.utils import (
     EDSLObject,
@@ -16,6 +24,30 @@ from edsl.coop.utils import (
 )
 
 from edsl.coop.CoopFunctionsMixin import CoopFunctionsMixin
+from edsl.coop.ExpectedParrotKeyHandler import ExpectedParrotKeyHandler
+
+from edsl.inference_services.data_structures import ServiceToModelsMapping
+
+
+class RemoteInferenceResponse(TypedDict):
+    job_uuid: str
+    results_uuid: str
+    results_url: str
+    latest_error_report_uuid: str
+    latest_error_report_url: str
+    status: str
+    reason: str
+    credits_consumed: float
+    version: str
+
+
+class RemoteInferenceCreationInfo(TypedDict):
+    uuid: str
+    description: str
+    status: str
+    iterations: int
+    visibility: str
+    version: str
 
 
 class Coop(CoopFunctionsMixin):
@@ -23,13 +55,16 @@ class Coop(CoopFunctionsMixin):
     Client for the Expected Parrot API.
     """
 
-    def __init__(self, api_key: str = None, url: str = None) -> None:
+    def __init__(
+        self, api_key: Optional[str] = None, url: Optional[str] = None
+    ) -> None:
         """
         Initialize the client.
         - Provide an API key directly, or through an env variable.
         - Provide a URL directly, or use the default one.
         """
-        self.api_key = api_key or os.getenv("EXPECTED_PARROT_API_KEY")
+        self.ep_key_handler = ExpectedParrotKeyHandler()
+        self.api_key = api_key or self.ep_key_handler.get_ep_api_key()
 
         self.url = url or CONFIG.EXPECTED_PARROT_URL
         if self.url.endswith("/"):
@@ -144,6 +179,7 @@ class Coop(CoopFunctionsMixin):
         Check the response from the server and raise errors as appropriate.
         """
         # Get EDSL version from header
+        # breakpoint()
         server_edsl_version = response.headers.get("X-EDSL-Version")
 
         if server_edsl_version:
@@ -152,11 +188,18 @@ class Coop(CoopFunctionsMixin):
                 server_version_str=server_edsl_version,
             ):
                 print(
-                    "Please upgrade your EDSL version to access our latest features. To upgrade, open your terminal and run `pip upgrade edsl`"
+                    "Please upgrade your EDSL version to access our latest features. To upgrade, open your terminal and run `pip install --upgrade edsl`"
                 )
 
         if response.status_code >= 400:
-            message = response.json().get("detail")
+            try:
+                message = response.json().get("detail")
+            except json.JSONDecodeError:
+                raise CoopServerResponseError(
+                    f"Server returned status code {response.status_code}."
+                    "JSON response could not be decoded.",
+                    "The server response was: " + response.text,
+                )
             # print(response.text)
             if "The API key you provided is invalid" in message and check_api_key:
                 import secrets
@@ -175,12 +218,17 @@ class Coop(CoopFunctionsMixin):
                     print("\nTimed out waiting for login. Please try again.")
                     return
 
-                path_to_env = write_api_key_to_env(api_key)
-                print(
-                    "\n✨ API key retrieved and written to .env file at the following path:"
-                )
-                print(f"    {path_to_env}")
-                print("Rerun your code to try again with a valid API key.")
+                print("\n✨ API key retrieved.")
+
+                if stored_in_user_space := self.ep_key_handler.ask_to_store(api_key):
+                    pass
+                else:
+                    path_to_env = write_api_key_to_env(api_key)
+                    print(
+                        "\n✨ API key retrieved and written to .env file at the following path:"
+                    )
+                    print(f"    {path_to_env}")
+                    print("Rerun your code to try again with a valid API key.")
                 return
 
             elif "Authorization" in message:
@@ -611,9 +659,6 @@ class Coop(CoopFunctionsMixin):
         self._resolve_server_response(response)
         return response.json()
 
-    ################
-    # Remote Inference
-    ################
     def remote_inference_create(
         self,
         job: Jobs,
@@ -622,7 +667,7 @@ class Coop(CoopFunctionsMixin):
         visibility: Optional[VisibilityType] = "unlisted",
         initial_results_visibility: Optional[VisibilityType] = "unlisted",
         iterations: Optional[int] = 1,
-    ) -> dict:
+    ) -> RemoteInferenceCreationInfo:
         """
         Send a remote inference job to the server.
 
@@ -654,18 +699,21 @@ class Coop(CoopFunctionsMixin):
         )
         self._resolve_server_response(response)
         response_json = response.json()
-        return {
-            "uuid": response_json.get("job_uuid"),
-            "description": response_json.get("description"),
-            "status": response_json.get("status"),
-            "iterations": response_json.get("iterations"),
-            "visibility": response_json.get("visibility"),
-            "version": self._edsl_version,
-        }
+
+        return RemoteInferenceCreationInfo(
+            **{
+                "uuid": response_json.get("job_uuid"),
+                "description": response_json.get("description"),
+                "status": response_json.get("status"),
+                "iterations": response_json.get("iterations"),
+                "visibility": response_json.get("visibility"),
+                "version": self._edsl_version,
+            }
+        )
 
     def remote_inference_get(
         self, job_uuid: Optional[str] = None, results_uuid: Optional[str] = None
-    ) -> dict:
+    ) -> RemoteInferenceResponse:
         """
         Get the details of a remote inference job.
         You can pass either the job uuid or the results uuid as a parameter.
@@ -707,17 +755,30 @@ class Coop(CoopFunctionsMixin):
                 f"{self.url}/home/remote-inference/error/{latest_error_report_uuid}"
             )
 
-        return {
-            "job_uuid": data.get("job_uuid"),
-            "results_uuid": results_uuid,
-            "results_url": results_url,
-            "latest_error_report_uuid": latest_error_report_uuid,
-            "latest_error_report_url": latest_error_report_url,
-            "status": data.get("status"),
-            "reason": data.get("reason"),
-            "credits_consumed": data.get("price"),
-            "version": data.get("version"),
-        }
+        return RemoteInferenceResponse(
+            **{
+                "job_uuid": data.get("job_uuid"),
+                "results_uuid": results_uuid,
+                "results_url": results_url,
+                "latest_error_report_uuid": latest_error_report_uuid,
+                "latest_error_report_url": latest_error_report_url,
+                "status": data.get("status"),
+                "reason": data.get("reason"),
+                "credits_consumed": data.get("price"),
+                "version": data.get("version"),
+            }
+        )
+
+    def get_running_jobs(self) -> list[str]:
+        """
+        Get a list of currently running job IDs.
+
+        Returns:
+            list[str]: List of running job UUIDs
+        """
+        response = self._send_server_request(uri="jobs/status", method="GET")
+        self._resolve_server_response(response)
+        return response.json().get("running_jobs", [])
 
     def remote_inference_cost(
         self, input: Union[Jobs, Survey], iterations: int = 1
@@ -819,7 +880,7 @@ class Coop(CoopFunctionsMixin):
                 "Invalid EDSL_FETCH_TOKEN_PRICES value---should be 'True' or 'False'."
             )
 
-    def fetch_models(self) -> dict:
+    def fetch_models(self) -> ServiceToModelsMapping:
         """
         Fetch a dict of available models from Coop.
 
@@ -828,7 +889,7 @@ class Coop(CoopFunctionsMixin):
         response = self._send_server_request(uri="api/v0/models", method="GET")
         self._resolve_server_response(response)
         data = response.json()
-        return data
+        return ServiceToModelsMapping(data)
 
     def fetch_rate_limit_config_vars(self) -> dict:
         """

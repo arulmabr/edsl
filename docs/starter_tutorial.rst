@@ -3,81 +3,160 @@
 Starter Tutorial
 ================
 
-This tutorial provides example code for getting started using EDSL, an open-source Python library for simulating surveys, experiments and other research tasks using AI agents and large language models.
-EDSL is available under the MIT License at `PyPI <https://pypi.org/project/edsl/>`_ and `GitHub <https://github.com/expectedparrot/edsl>`_.
+This tutorial provides step-by-step instructions for getting started using EDSL (*Expected Parrot Domain-Specific Language*), an open-source Python library for simulating surveys, experiments and other research tasks using AI agents and large language models.
+EDSL is developed by `Expected Parrot <https://www.expectedparrot.com/about>`_ and available under the MIT License.
+The source code is hosted on `GitHub <https://github.com/expectedparrot/edsl>`_.
 
-In the steps below we show how to construct and run a simple question in EDSL, and then how to design more complex surveys with AI agents and different language models.
-We also demonstrate methods for applying logic and rules to surveys, piping answers and adding data to questions, and analyzing survey results as datasets.
+**Goals of this tutorial**
 
-You can also `view this notebook at the Coop <https://www.expectedparrot.com/content/26d569e1-8356-45b7-9786-471dda1710ce>`_, a platform for creating, storing and sharing AI-based research.
-Coop is fully integrated with EDSL and free to use.
-Learn more in the `Coop <https://docs.expectedparrot.com/en/latest/coop.html>`_ section of the documentation.
+We begin with technical setup: instructions for installing the EDSL library and storing API keys to access language models.
+Then we demonstrate some of the basic features of EDSL, with examples for constructing and running surveys with agents and models, and analyzing responses as datasets.
+By the end of this tutorial, you will be able to use EDSL to do each of the following:
 
-Please also see an :ref:`overview` of features and common use cases for EDSL, and a :ref:`checklist` of tips on using EDSL effectively.
+* Construct various types of questions tailored to your research objectives.
+* Combine questions into surveys and integrate logical rules to control the survey flow.
+* Design personas for AI agents to simulate responses to your surveys.
+* Choose and deploy large language models to generate responses for AI agents.
+* Analyze responses as datasets with built-in analytical tools.
+
+**Storing & sharing your work** 
+
+We also introduce `Coop <https://www.expectedparrot.com/content/explore>`_: a platform for creating, storing and sharing AI-based research.
+Coop is fully integrated with EDSL and free to use. 
+At the end of the tutorial we show how to use EDSL with Coop by posting content created in this tutorial for anyone to view at the web app.
+Learn more about how :ref:`coop` works in the EDSL documentation.
+
+.. note::
+
+  You can also view and download the contents of this tutorial in a `notebook at Coop <https://www.expectedparrot.com/content/26d569e1-8356-45b7-9786-471dda1710ce>`_
+
+
+**Further reading** 
+
+In addition to this tutorial, please also see an :ref:`overview` of features and common use cases for EDSL and a :ref:`checklist` of tips for using EDSL effectively in the `EDSL documentation page <https://docs.expectedparrot.com/>`_.
+To see recent research using or citing EDSL, see :ref:`papers` in the documentation.
+
+**Questions**
+
 If you encounter any issues or have questions, please email us at info@expectedparrot.com or post a question at our `Discord channel <https://discord.com/invite/mxAYkjfy9m>`_.
 
 
-Technical setup
+.. contents:: Table of contents
+   :local:
+   :depth: 2
+
+
+Pre-requisites
+--------------
+
+EDSL is compatible with Python 3.9 - 3.12.
+Before starting this tutorial, please ensure that you have a Python environment set up on your machine or in a cloud-based environment, such as Google Colab.
+You can find instructions for installing Python at the `Python Software Foundation <https://www.python.org/downloads/>`_.
+
+
+Recommendations 
 ---------------
 
-To run the examples below you first need to install the EDSL library and choose how you want to access language models.
+Run code examples in a notebook
+  The code examples in this tutorial are designed to be run in a Jupyter notebook or another Python environment, or in a cloud-based environment such as Google Colab.
+  If you are using Google Colab, please see additional instructions for setting up EDSL in the `Colab setup <https://docs.expectedparrot.com/en/latest/colab_setup.html>`_ page in the documentation.
 
-*Note:* If you are using EDSL in Colab, please see the `Colab setup <https://docs.expectedparrot.com/en/latest/colab_setup.html>`_ page for additional instructions.
+Use a virtual environment
+  We also recommend using a virtual environment when installing and using EDSL in order to avoid conflicts with other Python packages.
+  You can find instructions for setting up a virtual environment at the `Python Packaging Authority <https://packaging.python.org/guides/installing-using-pip-and-virtual-environments/>`_.
+
+Special instructions for Colab users
+  If you are using EDSL in a cloud-based environment, such as Google Colab, you can find additional instructions for setting up EDSL in the `Colab setup <https://docs.expectedparrot.com/en/latest/colab_setup.html>`_ page in the documentation.
 
 
-Install EDSL
-^^^^^^^^^^^^
+Installation
+------------
 
-Run the following code to install the EDSL library. See :ref:`installation` instructions for more details.
+To begin using EDSL, you first need to install the library. 
+This can either be done locally on your machine or in a cloud-based environment, such as Google Colab.
+Once you have decided where to install EDSL, you can choose to whether install it from `PyPI <https://pypi.org/project/edsl/>`_ or `GitHub <https://github.com/expectedparrot/edsl>`_:
 
-.. code-block:: python
+From PyPI
+  Install EDSL directly using `pip`, which is straightforward and recommended for most users. 
+  We also recommend using a virtual environment to manage your Python packages (see *Recommendations* above).
+  Run the following command in your notebook to install EDSL from PyPI:
+
+.. code-block:: bash
 
   pip install edsl
 
 
-If you have already installed EDSL, you can check the version by running the following code and comparing the output to the version shown at PyPI:
+From GitHub
+  You can find the source code for EDSL and contribute to the project at `GitHub <https://github.com/expectedparrot/edsl>`_.
+  Installing from GitHub allows you to get the latest updates to EDSL before they are released to a new version at PyPI.
+  This is recommended if you are using new features or contributing to the project.
+  Run the following command to install EDSL from GitHub:
 
-.. code-block:: python
+.. code-block:: bash
+  
+  pip install git+https://github.com/expectedparrot/edsl.git@main
 
-  pip show edsl 
+
+After installing EDSL, you can check the version that you have installed by running the following command in your notebook:
+
+.. code-block:: bash
+
+  pip show edsl
 
 
-If your version of EDSL is not up to date, run the following code to update it:
+To update your installation of EDSL to the latest version at PyPI, run the following command:
 
-.. code-block:: python
+.. code-block:: bash
 
   pip install --upgrade edsl
 
 
-Choose how to access language models
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Next, decide how you want to access language models with EDSL and obtain the required API keys:
+Accessing Language Models
+-------------------------
 
-* *Remote inference*: This method allows you to run surveys at the Expected Parrot server and access all available language models at once with your Expected Parrot API key.
-<br>
-* *Local inference*: Alternatively, you can obtain your own API keys for service providers to run EDSL on your own machine.
-
-Your Expected Parrot API key can be found at the Settings page of your `Coop account <https://www.expectedparrot.com/login>`_, where you can select the option to `activate remote inference <https://docs.expectedparrot.com/en/latest/remote_inference.html>`_. 
-This key also allows you to `post and share content at the Coop <https://www.expectedparrot.com/content/explore>`_ that you create using either remote or local inference.
+The next step is to decide how you want to access language models for running surveys.
+EDSL works with many popular language models that you can choose from to generate responses to your surveys.
+These models are hosted by various service providers, such as Anthropic, Azure, Bedrock, Deep Infra, Google, Groq, Mistral, OpenAI, Replicate and Together.
+In order to run a survey, you need to provide API keys for the service providers of models that you want to use.
+There are two methods for providing API keys to EDSL:
 
 
-Store your API keys
-^^^^^^^^^^^^^^^^^^^
+Remote inference
+^^^^^^^^^^^^^^^^
 
-Make your keys available to EDSL by storing then in a file named "**.env**" in your working directory. Modify the code below (replacing '**your_key_here**' with each key that you want to use) and then run it to create an .env file in your current directory (the folder where you are running this notebooK). 
+This method allows you to use a single API key from Expected Parrot to access all available language models at once, and to run your surveys remotely at the Expected Parrot server.
+It is convenient for quickly accessing a wide range of models without needing to create accounts and set up individual API keys with service providers.
+It also allows you to automatically store your survey data on the Expected Parrot server to access it anywhere and share it with other users.
 
-If you already have a *.env* file, you can use the template below to modify the contents of the file instead of running the code to avoid overwriting it.
+To use remote inference:
 
-If you are using remote inference, you only need to store your Expected Parrot API key.
+1. Create or log in to your Coop account: https://www.expectedparrot.com/login
+2. Navigate to your `Settings <https://www.expectedparrot.com/settings>`_ page. Copy your Expected Parrot API key and activate remote inference.
+3. Create a file named *.env* in your working directory and add the following code to it (replace 'your_key_here' with your actual key):
 
-**Note: Your API keys should be treated like passwords and deleted from notebooks or content that you share with others. We recommend deleting your keys from the code below after your .env file has been created.**
+.. code-block:: text 
 
-.. code-block:: python 
+  EXPECTED_PARROT_API_KEY = 'your_key_here'
 
-  with open('.env', 'w') as f:
-    f.write('''
-  # Environment variables file
+
+*Note:* If you try to run a survey without storing a required API key, you will be provided a link to activate remote inference and automatically store your Expected Parrot API key in a *.env* file for you.
+
+
+Local inference
+^^^^^^^^^^^^^^^
+
+This method allows you to run EDSL on your own machine with your own API keys for service providers.
+To use this method, you will need to create accounts with service providers and obtain API keys from them.
+You can still use an Expected Parrot API key to post and share content at the Expected Parrot server, but you will need to do this manually.
+
+To use local inference:
+
+1. Create accounts with service providers and obtain API keys from them.
+2. Create a file named *.env* in your working directory and add the following code to it (replace 'your_key_here' with your actual keys):
+
+.. code-block:: text 
+
   EXPECTED_PARROT_API_KEY = 'your_key_here'
 
   ANTHROPIC_API_KEY = 'your_key_here'
@@ -87,14 +166,18 @@ If you are using remote inference, you only need to store your Expected Parrot A
   MISTRAL_API_KEY = 'your_key_here'
   OPENAI_API_KEY = 'your_key_here'
   REPLICATE_API_KEY = 'your_key_here'
-  ''')
+
+
+*Note:* Your API keys should be treated like passwords and deleted from notebooks or content that you share with others. 
+
+Now that we have installed EDSL and set up API keys, we can start using it to create surveys and analyze results.
 
 
 Example: Running a simple question
 ----------------------------------
 
 EDSL comes with a `variety of question types <https://docs.expectedparrot.com/en/latest/questions.html>`_ that we can choose from based on the form of the response that we want to get back from a model.
-To see a list of all question types:
+We can see a list of all question types and examples of each of them by running the following code:
 
 .. code-block:: python
 
@@ -106,66 +189,70 @@ To see a list of all question types:
 Output:
 
 .. list-table::
-  :header-rows: 1
+   :header-rows: 1
+   :widths: 15 20 65
 
-  * - question_type
-    - question_class
-    - example_question
-  * - checkbox
-    - QuestionCheckBox
-    - Question('checkbox', name="never_eat", text="Which foods would you eat?", min=2, max=5, options=['soggy meatpie', 'rare snails', 'mouldy bread', 'panda milk custard', 'McDonalds'])
-  * - extract 
-    - QuestionExtract
-    - Question('extract', name="extract_name", text="My name is Moby Dick...", template={'name': 'John Doe', 'profession': 'Carpenter'})
-  * - free_text
-    - QuestionFreeText  
-    - Question('free_text', name="how_are_you", text="How are you?")
-  * - functional
-    - QuestionFunctional
-    - Question('functional', name="sum_and_multiply", text="Calculate sum and multiply by trait multiplier.")
-  * - likert_five
-    - QuestionLikertFive
-    - Question('likert_five', name="happy_raining", text="I'm only happy when it rains.", options=['Strongly disagree'-'Strongly agree'])
-  * - linear_scale
-    - QuestionLinearScale
-    - Question('linear_scale', name="ice_cream", text="How much do you like ice cream?", options=[1-5], labels={1:'hate', 5:'love'})
-  * - list
-    - QuestionList
-    - Question('list', name="list_of_foods", text="What are your favorite foods?")
-  * - multiple_choice
-    - QuestionMultipleChoice
-    - Question('multiple_choice', name="how_feeling", text="How are you?", options=['Good','Great','OK','Bad'])
-  * - numerical
-    - QuestionNumerical
-    - Question('numerical', name="age", text="You are 45. How old are you?", min=0, max=86.7)
-  * - rank
-    - QuestionRank
-    - Question('rank', name="rank_foods", text="Rank your favorite foods.", options=['Pizza','Pasta','Salad','Soup'], num=2)
-  * - top_k
-    - QuestionTopK
-    - Question('top_k', name="two_fruits", text="Which fruits do you prefer?", min=2, max=2, options=['apple','banana','carrot','durian'])
-  * - yes_no
-    - QuestionYesNo
-    - Question('yes_no', name="is_it_equal", text="Is 5 + 5 equal to 11?", options=['No','Yes'])
+   * - question_type
+     - question_class
+     - example_question
+   * - checkbox
+     - QuestionCheckBox
+     - Question('checkbox', question_name="""never_eat""", question_text="""Which of the following foods would you eat if you had to?""", min_selections=2, max_selections=5, question_options=['soggy meatpie', 'rare snails', 'mouldy bread', 'panda milk custard', 'McDonalds'], include_comment=False, use_code=True)
+   * - extract
+     - QuestionExtract
+     - Question('extract', question_name="""extract_name""", question_text="""My name is Moby Dick. I have a PhD in astrology, but I'm actually a truck driver""", answer_template={'name': 'John Doe', 'profession': 'Carpenter'})
+   * - free_text
+     - QuestionFreeText
+     - Question('free_text', question_name="""how_are_you""", question_text="""How are you?""")
+   * - functional
+     - QuestionFunctional
+     - Question('functional', question_name="""sum_and_multiply""", question_text="""Calculate the sum of the list and multiply it by the agent trait multiplier.""")
+   * - likert_five
+     - QuestionLikertFive
+     - Question('likert_five', question_name="""happy_raining""", question_text="""I'm only happy when it rains.""", question_options=['Strongly disagree', 'Disagree', 'Neutral', 'Agree', 'Strongly agree'])
+   * - linear_scale
+     - QuestionLinearScale
+     - Question('linear_scale', question_name="""ice_cream""", question_text="""How much do you like ice cream?""", question_options=[1, 2, 3, 4, 5], option_labels={1: 'I hate it', 5: 'I love it'})
+   * - list
+     - QuestionList
+     - Question('list', question_name="""list_of_foods""", question_text="""What are your favorite foods?""", max_list_items=None)
+   * - matrix
+     - QuestionMatrix
+     - Question('matrix', question_name="""child_happiness""", question_text="""How happy would you be with different numbers of children?""", question_items=['No children', '1 child', '2 children', '3 or more children'], question_options=[1, 2, 3, 4, 5], option_labels={1: 'Very sad', 3: 'Neutral', 5: 'Extremely happy'})
+   * - multiple_choice
+     - QuestionMultipleChoice
+     - Question('multiple_choice', question_name="""how_feeling""", question_text="""How are you?""", question_options=['Good', 'Great', 'OK', 'Bad'], include_comment=False)
+   * - numerical
+     - QuestionNumerical
+     - Question('numerical', question_name="""age""", question_text="""You are a 45 year old man. How old are you in years?""", min_value=0, max_value=86.7, include_comment=False)
+   * - rank
+     - QuestionRank
+     - Question('rank', question_name="""rank_foods""", question_text="""Rank your favorite foods.""", question_options=['Pizza', 'Pasta', 'Salad', 'Soup'], num_selections=2)
+   * - top_k
+     - QuestionTopK
+     - Question('top_k', question_name="""two_fruits""", question_text="""Which of the following fruits do you prefer?""", min_selections=2, max_selections=2, question_options=['apple', 'banana', 'carrot', 'durian'], use_code=True)
+   * - yes_no
+     - QuestionYesNo
+     - Question('yes_no', question_name="""is_it_equal""", question_text="""Is 5 + 5 equal to 11?""", question_options=['No', 'Yes'])
  
 
-We can see the components of a particular question type by importing the question type class and calling the `example` method on it:
+We can inspect the components of a particular question type by importing the question type class and calling the `example` method on it:
 
 .. code-block:: python
 
   from edsl import (
-      # QuestionCheckBox,
-      # QuestionExtract,
-      # QuestionFreeText,
-      # QuestionFunctional,
-      # QuestionLikertFive,
-      # QuestionLinearScale,
-      # QuestionList,
-      QuestionMultipleChoice,
-      # QuestionNumerical,
-      # QuestionRank,
-      # QuestionTopK,
-      # QuestionYesNo
+    # QuestionCheckBox,
+    # QuestionExtract,
+    # QuestionFreeText,
+    # QuestionFunctional,
+    # QuestionLikertFive,
+    # QuestionLinearScale,
+    # QuestionList,
+    QuestionMultipleChoice,
+    # QuestionNumerical,
+    # QuestionRank,
+    # QuestionTopK,
+    # QuestionYesNo
   )
 
   q = QuestionMultipleChoice.example() # substitute any question type class name
@@ -175,20 +262,26 @@ We can see the components of a particular question type by importing the questio
 Output:
 
 .. list-table::
-  :header-rows: 1
+   :header-rows: 1
 
-  * - keys
-    - values
-  * - question_name
-    - how_feeling
-  * - question_text
-    - How are you?
-  * - question_options
-    - ['Good', 'Great', 'OK', 'Bad']
-  * - include_comment
-    - False
-  * - question_type
-    - multiple_choice
+   * - key
+     - value
+   * - question_name
+     - how_feeling
+   * - question_text
+     - How are you?
+   * - question_options:0
+     - Good
+   * - question_options:1
+     - Great
+   * - question_options:2
+     - OK
+   * - question_options:3
+     - Bad
+   * - include_comment
+     - False
+   * - question_type
+     - multiple_choice
 
 
 Here we create a simple multiple choice question:
@@ -198,13 +291,14 @@ Here we create a simple multiple choice question:
   from edsl import QuestionMultipleChoice
 
   q = QuestionMultipleChoice(
-      question_name = "smallest_prime",
-      question_text = "Which is the smallest prime number?",
-      question_options = [0, 1, 2, 3]
+    question_name = "smallest_prime",
+    question_text = "Which is the smallest prime number?",
+    question_options = [0, 1, 2, 3]
   )
 
 
-We can administer it to a language model by calling the run method (note: if remote inference has been activated, information about the job and results will be stored on the Expected Parrot server and URLs will be displayed):
+We can administer it to a language model by calling the `run()` method on it.
+(*Note:* if remote inference has been activated, information about the job and results will be stored on the Expected Parrot server and URLs will be displayed automatically.)
 
 .. code-block:: python
 
@@ -222,14 +316,14 @@ Here we inspect the response, together with the model that was used and the mode
 Output:
 
 .. list-table::
-  :header-rows: 1
+   :header-rows: 1
 
-  * - model.model
-    - answer.smallest_prime
-    - comment.smallest_prime_comment
-  * - gpt-4o
-    - 2
-    - 2 is the smallest prime number because it is the only even number greater than 1 that is divisible only by 1 and itself.
+   * - model.model
+     - answer.smallest_prime
+     - comment.smallest_prime_comment
+   * - gpt-4o
+     - 2
+     - 2 is the smallest prime number because it is the only even number greater than 1 that is divisible only by 1 and itself.
 
 
 The `Results` also include information about the question, model parameters, prompts, generated tokens and raw responses. 
@@ -237,37 +331,37 @@ To see a list of all the components:
 
 .. code-block:: python
 
-    results.columns
+  results.columns
 
 
 Output:
 
 .. list-table::
-  :header-rows: 1 
+   :header-rows: 1
 
-  * - 
-    - 'agent.agent_instruction',
-    - 'agent.agent_name',
-    - 'answer.smallest_prime',
-    - 'comment.smallest_prime_comment',
-    - 'generated_tokens.smallest_prime_generated_tokens',
-    - 'iteration.iteration',
-    - 'model.frequency_penalty',
-    - 'model.logprobs',
-    - 'model.max_tokens',
-    - 'model.model',
-    - 'model.presence_penalty',
-    - 'model.temperature',
-    - 'model.top_logprobs',
-    - 'model.top_p',
-    - 'prompt.smallest_prime_system_prompt',
-    - 'prompt.smallest_prime_user_prompt',
-    - 'question_options.smallest_prime_question_options',
-    - 'question_text.smallest_prime_question_text',
-    - 'question_type.smallest_prime_question_type',
-    - 'raw_model_response.smallest_prime_cost',
-    - 'raw_model_response.smallest_prime_one_usd_buys',
-    - 'raw_model_response.smallest_prime_raw_model_response']
+   * - 0
+   * - agent.agent_instruction
+   * - agent.agent_name
+   * - answer.smallest_prime
+   * - comment.smallest_prime_comment
+   * - generated_tokens.smallest_prime_generated_tokens
+   * - iteration.iteration
+   * - model.frequency_penalty
+   * - model.logprobs
+   * - model.max_tokens
+   * - model.model
+   * - model.presence_penalty
+   * - model.temperature
+   * - model.top_logprobs
+   * - model.top_p
+   * - prompt.smallest_prime_system_prompt
+   * - prompt.smallest_prime_user_prompt
+   * - question_options.smallest_prime_question_options
+   * - question_text.smallest_prime_question_text
+   * - question_type.smallest_prime_question_type
+   * - raw_model_response.smallest_prime_cost
+   * - raw_model_response.smallest_prime_one_usd_buys
+   * - raw_model_response.smallest_prime_raw_model_response
 
 
 Example: Conducting a survey with agents and models
@@ -280,28 +374,28 @@ We start by creating questions in different types and passing them to a `Survey`
 
 .. code-block:: python 
 
-    from edsl import QuestionLinearScale, QuestionFreeText
+  from edsl import QuestionLinearScale, QuestionFreeText
 
-    q_enjoy = QuestionLinearScale(
-        question_name = "enjoy",
-        question_text = "On a scale from 1 to 5, how much do you enjoy reading?",
-        question_options = [1, 2, 3, 4, 5],
-        option_labels = {1:"Not at all", 5:"Very much"}
-    )
+  q_enjoy = QuestionLinearScale(
+    question_name = "enjoy",
+    question_text = "On a scale from 1 to 5, how much do you enjoy reading?",
+    question_options = [1, 2, 3, 4, 5],
+    option_labels = {1:"Not at all", 5:"Very much"}
+  )
 
-    q_favorite_place = QuestionFreeText(
-        question_name = "favorite_place",
-        question_text = "Describe your favorite place for reading."
-    )
+  q_favorite_place = QuestionFreeText(
+    question_name = "favorite_place",
+    question_text = "Describe your favorite place for reading."
+  )
 
 
 We construct a `Survey` by passing a list of questions:
 
 .. code-block:: python
 
-    from edsl import Survey
+  from edsl import Survey
 
-    survey = Survey(questions = [q_enjoy, q_favorite_place])
+  survey = Survey(questions = [q_enjoy, q_favorite_place])
 
 
 Agents
@@ -318,7 +412,7 @@ Here we construct several simple agent personas to use with our survey:
   from edsl import AgentList, Agent
 
   agents = AgentList(
-      Agent(traits = {"persona":p}) for p in ["artist", "mechanic", "sailor"]
+    Agent(traits = {"persona":p}) for p in ["artist", "mechanic", "sailor"]
   )
 
 
@@ -347,26 +441,26 @@ To check the default model that will be used if no models are specified for a su
 Output (may be different if the default model has changed):
 
 .. list-table::
-  :header-rows: 1
+   :header-rows: 1
 
-  * - keys
-    - values
-  * - model
-    - gpt-4o
-  * - temperature
-    - 0.5
-  * - max_tokens
-    - 1000
-  * - top_p
-    - 1
-  * - frequency_penalty
-    - 0
-  * - presence_penalty
-    - 0
-  * - logprobs
-    - False
-  * - top_logprobs
-    - 3
+   * - key
+     - value
+   * - model
+     - gpt-4o
+   * - parameters:temperature
+     - 0.5
+   * - parameters:max_tokens
+     - 1000
+   * - parameters:top_p
+     - 1
+   * - parameters:frequency_penalty
+     - 0
+   * - parameters:presence_penalty
+     - 0
+   * - parameters:logprobs
+     - False
+   * - parameters:top_logprobs
+     - 3
 
 
 Here we select some models to use with our survey:
@@ -376,8 +470,8 @@ Here we select some models to use with our survey:
   from edsl import ModelList, Model
 
   models = ModelList(
-      Model(m) for m in ["gpt-4o", "gemini-pro"]
-      )
+    Model(m) for m in ["gpt-4o", "gemini-pro"]
+    )
 
 
 Running a survey
@@ -391,44 +485,44 @@ Then we administer a survey the same way that we do an individual question, by c
   results = survey.by(agents).by(models).run()
 
   (
-      results
-      .sort_by("persona", "model")
-      .select("model", "persona", "enjoy", "favorite_place")
+    results
+    .sort_by("persona", "model")
+    .select("model", "persona", "enjoy", "favorite_place")
   )
 
 Example output:
 
 .. list-table::
-  :header-rows: 1
+   :header-rows: 1
 
-  * - model.model
-    - agent.persona
-    - answer.enjoy
-    - answer.favorite_place
-  * - gemini-pro
-    - artist
-    - 5
-    - Nestled amidst the verdant embrace of a sprawling park, my favorite reading sanctuary unfolds as a secluded haven where tranquility reigns supreme. Beneath the towering canopy of ancient oak trees, a quaint bench beckons, its weathered surface inviting me to sink into its embrace. As I settle in, the gentle rustling of leaves overhead creates a soothing symphony that calms my mind and prepares me for the literary journey ahead. The air is fragrant with the sweet scent of blooming wildflowers, carried by a soft breeze that whispers secrets through the trees. The vibrant hues of nature paint the canvas around me, inspiring a sense of wonder and connection to the world. As I open the pages of my chosen book, the outside world fades into oblivion. The words dance before my eyes, inviting me into realms unknown. The characters become my companions, their stories unfolding before me like a captivating tapestry. Time seems to stand still in this idyllic setting. The worries of the day dissolve as I immerse myself in the written word. The worries of the day dissolve as I immerse myself in the written word. The worries of the day dissolve as I immerse myself in the written word. As the sun begins its descent, casting long shadows across the park, I close my book and savor the lingering glow of the day. The world around me has transformed into a magical realm, where the boundaries between reality and imagination blur.
-  * - gpt-4o
-    - artist
-    - 4
-    - My favorite place for reading is a cozy nook by a large window in my art studio. The natural light that streams in during the day is perfect for both reading and painting. I have a comfortable armchair draped with a colorful throw, and a small wooden side table where I keep a steaming cup of herbal tea. The walls are adorned with my paintings, which add a touch of inspiration and creativity to the atmosphere. It's a quiet, peaceful space where I can lose myself in a good book or simply gaze out at the changing scenery outside.
-  * - gemini-pro
-    - mechanic
-    - 5
-    - In the heart of my cozy abode, where solitude and inspiration intertwine, lies my sanctuary of literary bliss—my reading nook. Bathed in the warm glow of a vintage lamp, it beckons me with its allure, a haven where I can escape into the realms of imagination. The walls are adorned with shelves brimming with an eclectic collection of books, their spines whispering tales of adventure, romance, and wisdom. The air is infused with the faint scent of paper and ink, a symphony that awakens my senses. A plush armchair, upholstered in soft velvet, invites me to sink into its embrace, enveloping me in a cocoon of comfort. A large window frames the verdant garden outside, offering a tranquil view of nature's artistry. As I turn the pages, the rustling of leaves and the chirping of birds create a soothing soundtrack that enhances my reading experience. The gentle breeze carries the sweet fragrance of blooming flowers, mingling with the scent of freshly brewed coffee on my side table. In this tranquil haven, I am free to lose myself in the written word. Time seems to stand still as I journey through distant lands, unravel mysteries, and explore the depths of human emotion. The characters become my companions, their struggles and triumphs mirroring my own.
-  * - gpt-4o
-    - mechanic
-    - 2
-    - As a mechanic, my favorite place for reading might not be what you'd expect. I enjoy reading in my garage, surrounded by the hum of engines and the smell of oil. There's something comforting about being in my element, with tools and parts all around me. I usually set up a small corner with a sturdy chair and a good lamp, so I can dive into a book during my breaks. Whether it's a manual on the latest automotive technology or a novel to unwind, the garage is my go-to spot.
-  * - gemini-pro
-    - sailor
-    - 5
-    - Amidst the bustling city's cacophony, I seek solace in a sanctuary of tranquility—my favorite reading nook. Nestled in a cozy corner of my apartment, it is an oasis of serenity. The soft glow of a vintage lamp illuminates a comfortable armchair, its plush cushions inviting me to sink into its embrace. A large window frames a vibrant cityscape, providing a backdrop of constant movement and life. Yet, within this cozy haven, I find stillness and escape. The walls are adorned with an eclectic collection of artwork, each piece evoking a different memory or inspiration. A vibrant abstract painting captures the essence of a stormy sea, while a delicate watercolor depicts the serene beauty of a mountain meadow. These visual cues transport me to distant realms, setting the stage for literary adventures. The air is scented with the faint aroma of freshly brewed coffee and the subtle fragrance of old books. The gentle hum of the city outside fades into a distant murmur, creating an atmosphere conducive to deep contemplation and immersion. As I settle into my armchair, I reach for a book. Its pages hold the promise of countless worlds to explore, characters to meet, and lessons to learn. The weight of the book in my hands feels both comforting and exhilarating, a tangible connection to the boundless possibilities within its covers. With each turn of the page, I am transported to different times and places. I witness the rise and fall of empires, the triumphs and tragedies of human lives, and the wonders of the natural world. The words dance before my eyes, painting vivid images in my mind. I become lost in the stories, my own worries and concerns fading away.
-  * - gpt-4o
-    - sailor
-    - 3
-    - Ah, my favorite place for reading has to be the deck of a ship, with the vast ocean stretching out endlessly before me. There's something about the gentle rocking of the waves and the salty sea breeze that makes any book come alive. I love settling into a sturdy deck chair, perhaps with a mug of strong coffee or a tot of rum by my side, and losing myself in a tale while the sun sets on the horizon, painting the sky with colors that even the best of stories can't quite capture. The sound of the water lapping against the hull provides a soothing background, making it the perfect spot to dive into a good book.
+   * - model.model
+     - agent.persona
+     - answer.enjoy
+     - answer.favorite_place
+   * - gemini-pro
+     - artist
+     - 5
+     - Nestled amidst the verdant embrace of a sprawling park, my favorite reading sanctuary unfolds as a secluded haven where tranquility reigns supreme. Beneath the towering canopy of ancient oak trees, a quaint bench beckons, its weathered surface inviting me to sink into its embrace. As I settle in, the gentle rustling of leaves overhead creates a soothing symphony that calms my mind and prepares me for the literary journey ahead. The air is fragrant with the sweet scent of blooming wildflowers, carried by a soft breeze that whispers secrets through the trees. The vibrant hues of nature paint the canvas around me, inspiring a sense of wonder and connection to the world. As I open the pages of my chosen book, the outside world fades into oblivion. The words dance before my eyes, inviting me into realms unknown. The characters become my companions, their stories unfolding before me like a captivating tapestry. Time seems to stand still in this idyllic setting. The worries of the day dissolve as I immerse myself in the written word. As the sun begins its descent, casting long shadows across the park, I close my book and savor the lingering glow of the day. The world around me has transformed into a magical realm, where the boundaries between reality and imagination blur.
+   * - gpt-4o
+     - artist
+     - 4
+     - My favorite place for reading is a cozy nook by a large window in my art studio. The natural light that streams in during the day is perfect for both reading and painting. I have a comfortable armchair draped with a colorful throw, and a small wooden side table where I keep a steaming cup of herbal tea. The walls are adorned with my paintings, which add a touch of inspiration and creativity to the atmosphere. It's a quiet, peaceful space where I can lose myself in a good book or simply gaze out at the changing scenery outside.
+   * - gemini-pro
+     - mechanic
+     - 5
+     - In the heart of my cozy abode, where solitude and inspiration intertwine, lies my sanctuary of literary bliss—my reading nook. Bathed in the warm glow of a vintage lamp, it beckons me with its allure, a haven where I can escape into the realms of imagination. The walls are adorned with shelves brimming with an eclectic collection of books, their spines whispering tales of adventure, romance, and wisdom. The air is infused with the faint scent of paper and ink, a symphony that awakens my senses. A plush armchair, upholstered in soft velvet, invites me to sink into its embrace, enveloping me in a cocoon of comfort. A large window frames the verdant garden outside, offering a tranquil view of nature's artistry. As I turn the pages, the rustling of leaves and the chirping of birds create a soothing soundtrack that enhances my reading experience. The gentle breeze carries the sweet fragrance of blooming flowers, mingling with the scent of freshly brewed coffee on my side table. In this tranquil haven, I am free to lose myself in the written word. Time seems to stand still as I journey through distant lands, unravel mysteries, and explore the depths of human emotion. The characters become my companions, their struggles and triumphs mirroring my own.
+   * - gpt-4o
+     - mechanic
+     - 2
+     - As a mechanic, my favorite place for reading might not be what you'd expect. I enjoy reading in my garage, surrounded by the hum of engines and the smell of oil. There's something comforting about being in my element, with tools and parts all around me. I usually set up a small corner with a sturdy chair and a good lamp, so I can dive into a book during my breaks. Whether it's a manual on the latest automotive technology or a novel to unwind, the garage is my go-to spot.
+   * - gemini-pro
+     - sailor
+     - 5
+     - Amidst the bustling city's cacophony, I seek solace in a sanctuary of tranquility—my favorite reading nook. Nestled in a cozy corner of my apartment, it is an oasis of serenity. The soft glow of a vintage lamp illuminates a comfortable armchair, its plush cushions inviting me to sink into its embrace. A large window frames a vibrant cityscape, providing a backdrop of constant movement and life. Yet, within this cozy haven, I find stillness and escape. The walls are adorned with an eclectic collection of artwork, each piece evoking a different memory or inspiration. A vibrant abstract painting captures the essence of a stormy sea, while a delicate watercolor depicts the serene beauty of a mountain meadow. These visual cues transport me to distant realms, setting the stage for literary adventures. The air is scented with the faint aroma of freshly brewed coffee and the subtle fragrance of old books. The gentle hum of the city outside fades into a distant murmur, creating an atmosphere conducive to deep contemplation and immersion. As I settle into my armchair, I reach for a book. Its pages hold the promise of countless worlds to explore, characters to meet, and lessons to learn. The weight of the book in my hands feels both comforting and exhilarating, a tangible connection to the boundless possibilities within its covers. With each turn of the page, I am transported to different times and places. I witness the rise and fall of empires, the triumphs and tragedies of human lives, and the wonders of the natural world. The words dance before my eyes, painting vivid images in my mind. I become lost in the stories, my own worries and concerns fading away.
+   * - gpt-4o
+     - sailor
+     - 3
+     - Ah, my favorite place for reading has to be the deck of a ship, with the vast ocean stretching out endlessly before me. There's something about the gentle rocking of the waves and the salty sea breeze that makes any book come alive. I love settling into a sturdy deck chair, perhaps with a mug of strong coffee or a tot of rum by my side, and losing myself in a tale while the sun sets on the horizon, painting the sky with colors that even the best of stories can't quite capture. The sound of the water lapping against the hull provides a soothing background, making it the perfect spot to dive into a good book.
 
 
 Example: Adding context to questions
@@ -456,13 +550,13 @@ Here we insert the answer to a numerical question into the text of a follow-on y
   from edsl import QuestionNumerical, QuestionYesNo, Survey
 
   q1 = QuestionNumerical(
-      question_name = "random_number",
-      question_text = "Pick a random number between 1 and 1,000."
+    question_name = "random_number",
+    question_text = "Pick a random number between 1 and 1,000."
   )
 
   q2 = QuestionYesNo(
-      question_name = "prime",
-      question_text = "Is this a prime number: {{ random_number.answer }}"
+    question_name = "prime",
+    question_text = "Is this a prime number: {{ random_number.answer }}"
   )
 
   survey = Survey([q1, q2])
@@ -480,16 +574,25 @@ We can check the `user_prompt` for the `prime` question to verify that that the 
 Example output:
 
 .. list-table::
-  :header-rows: 1
+   :header-rows: 1
 
-  * - answer.random_number
-    - prompt.prime_user_prompt
-    - answer.prime
-    - comment.prime_comment
-  * - 487
-    - Is this a prime number: 487 No Yes Only 1 option may be selected. Please respond with just your answer. After the answer, you can put a comment explaining your response.
-    - No
-    - 487 is not a prime number because it can be divided evenly by 1, 487, and also by 19 and 25.
+   * - answer.random_number
+     - prompt.prime_user_prompt
+     - answer.prime
+     - comment.prime_comment
+   * - 487
+     - Is this a prime number: 487
+
+       No
+
+       Yes
+
+       Only 1 option may be selected.
+       Please respond with just your answer.
+
+       After the answer, you can put a comment explaining your response.
+     - No
+     - 487 is not a prime number because it can be divided evenly by 1, 487, and also by 19 and 25.
 
 
 Adding "memory" of questions and answers
@@ -507,13 +610,13 @@ Here we demonstrate the `add_targeted_memory` method (we could also use `set_ful
   from edsl import QuestionNumerical, QuestionYesNo, Survey
 
   q1 = QuestionNumerical(
-      question_name = "random_number",
-      question_text = "Pick a random number between 1 and 1,000."
+    question_name = "random_number",
+    question_text = "Pick a random number between 1 and 1,000."
   )
 
   q2 = QuestionYesNo(
-      question_name = "prime",
-      question_text = "Is the number you picked a prime number?"
+    question_name = "prime",
+    question_text = "Is the number you picked a prime number?"
   )
 
   survey = Survey([q1, q2]).add_targeted_memory(q2, q1)
@@ -531,23 +634,21 @@ We can again use the `user_prompt` to verify the context that was added to the f
 Example output:
 
 .. list-table::
-  :header-rows: 1
+   :header-rows: 1
 
-  * - row
-    - key
-    - value
-  * - 0
-    - answer.random_number
-    - 487
-  * - 0
-    - prompt.prime_user_prompt
-    - Is the number you picked a prime number? No Yes Only 1 option may be selected. Please respond with just your answer. After the answer, you can put a comment explaining your response. Before the question you are now answering, you already answered the following question(s): Question: Pick a random number between 1 and 1,000. Answer: 487
-  * - 0
-    - answer.prime
-    - Yes
-  * - 0
-    - comment.prime_comment
-    - 487 is a prime number because it has no divisors other than 1 and itself.
+   * - row
+     - key
+     - value
+   * - 0
+     - answer.random_number
+     - 487
+   * - 0
+     - prompt.prime_user_prompt
+     - Is the number you picked a prime number?
+
+       No
+
+       Yes
 
 
 Scenarios
@@ -588,15 +689,15 @@ Here we add the scenarios to the survey when we run it, together with any desire
   from edsl import QuestionLinearScale, QuestionFreeText, Survey
 
   q_enjoy = QuestionLinearScale(
-      question_name = "enjoy",
-      question_text = "On a scale from 1 to 5, how much do you enjoy {{ activity }}?",
-      question_options = [1, 2, 3, 4, 5],
-      option_labels = {1:"Not at all", 5:"Very much"}
+    question_name = "enjoy",
+    question_text = "On a scale from 1 to 5, how much do you enjoy {{ activity }}?",
+    question_options = [1, 2, 3, 4, 5],
+    option_labels = {1:"Not at all", 5:"Very much"}
   )
 
   q_favorite_place = QuestionFreeText(
-      question_name = "favorite_place",
-      question_text = "In a brief sentence, describe your favorite place for {{ activity }}."
+    question_name = "favorite_place",
+    question_text = "In a brief sentence, describe your favorite place for {{ activity }}."
   )
 
   survey = Survey([q_enjoy, q_favorite_place])
@@ -604,58 +705,58 @@ Here we add the scenarios to the survey when we run it, together with any desire
   results = survey.by(scenarios).by(agents).by(models).run()
 
   (
-      results
-      .filter("model.model == 'gpt-4o'")
-      .sort_by("activity", "persona")
-      .select("activity", "persona", "enjoy", "favorite_place")
+    results
+    .filter("model.model == 'gpt-4o'")
+    .sort_by("activity", "persona")
+    .select("activity", "persona", "enjoy", "favorite_place")
   )
 
 
-Example output:
+Output:
 
 .. list-table::
-  :header-rows: 1
+   :header-rows: 1
 
-  * - scenario.activity
-    - agent.persona
-    - answer.enjoy
-    - answer.favorite_place
-  * - reading
-    - artist
-    - 4
-    - My favorite place for reading is a cozy nook by a large window, where the natural light spills over the pages, surrounded by plants and the gentle hum of city life outside.
-  * - reading
-    - mechanic
-    - 2
-    - My favorite place for reading is in my garage, surrounded by the hum of engines and the scent of motor oil, where I can escape into a good book during breaks.
-  * - reading
-    - sailor
-    - 3
-    - Ah, my favorite place for reading is out on the deck of a ship, with the salty sea breeze in my hair and the gentle rocking of the waves beneath me.
-  * - relaxing
-    - artist
-    - 4
-    - My favorite place for relaxing is a sun-dappled studio filled with the scent of fresh paint and the gentle hum of creativity.
-  * - relaxing
-    - mechanic
-    - 3
-    - My favorite place for relaxing is in my garage, tinkering with an old engine, where the hum of tools and the smell of grease help me unwind.
-  * - relaxing
-    - sailor
-    - 3
-    - There's nothing quite like the gentle sway of a hammock on the deck of a ship, with the sound of the ocean waves lapping against the hull and the salty breeze in the air.
-  * - running
-    - artist
-    - 2
-    - My favorite place for running is a winding forest trail where the sunlight filters through the leaves, creating a dappled pattern on the ground.
-  * - running
-    - mechanic
-    - 1
-    - My favorite place for running is a quiet trail through the woods, where the fresh air and natural surroundings make each step feel refreshing.
-  * - running
-    - sailor
-    - 2
-    - Ah, my favorite place for running is along the rugged coastline, where the salty sea breeze fills the air and the waves crash against the rocks, reminding me of the vastness of the ocean.
+   * - scenario.activity
+     - agent.persona
+     - answer.enjoy
+     - answer.favorite_place
+   * - reading
+     - artist
+     - 4
+     - My favorite place for reading is a cozy nook by a large window, where the natural light spills over the pages, surrounded by plants and the gentle hum of city life outside.
+   * - reading
+     - mechanic
+     - 2
+     - My favorite place for reading is in my garage, surrounded by the hum of engines and the scent of motor oil, where I can escape into a good book during breaks.
+   * - reading
+     - sailor
+     - 3
+     - Ah, my favorite place for reading is out on the deck of a ship, with the salty sea breeze in my hair and the gentle rocking of the waves beneath me.
+   * - relaxing
+     - artist
+     - 4
+     - My favorite place for relaxing is a sun-dappled studio filled with the scent of fresh paint and the gentle hum of creativity.
+   * - relaxing
+     - mechanic
+     - 3
+     - My favorite place for relaxing is in my garage, tinkering with an old engine, where the hum of tools and the smell of grease help me unwind.
+   * - relaxing
+     - sailor
+     - 3
+     - There's nothing quite like the gentle sway of a hammock on the deck of a ship, with the sound of the ocean waves lapping against the hull and the salty breeze in the air.
+   * - running
+     - artist
+     - 2
+     - My favorite place for running is a winding forest trail where the sunlight filters through the leaves, creating a dappled pattern on the ground.
+   * - running
+     - mechanic
+     - 1
+     - My favorite place for running is a quiet trail through the woods, where the fresh air and natural surroundings make each step feel refreshing.
+   * - running
+     - sailor
+     - 2
+     - Ah, my favorite place for running is along the rugged coastline, where the salty sea breeze fills the air and the waves crash against the rocks, reminding me of the vastness of the ocean.
 
 
 Adding scenarios using the `loop` method
@@ -670,15 +771,15 @@ Note that we can also optionally use the scenario key in the question names (the
   from edsl import QuestionLinearScale, QuestionFreeText
 
   q_enjoy = QuestionLinearScale(
-      question_name = "enjoy_{{ activity }}", # optional use of scenario key
-      question_text = "On a scale from 1 to 5, how much do you enjoy {{ activity }}?",
-      question_options = [1, 2, 3, 4, 5],
-      option_labels = {1:"Not at all", 5:"Very much"}
+    question_name = "enjoy_{{ activity }}", # optional use of scenario key
+    question_text = "On a scale from 1 to 5, how much do you enjoy {{ activity }}?",
+    question_options = [1, 2, 3, 4, 5],
+    option_labels = {1:"Not at all", 5:"Very much"}
   )
 
   q_favorite_place = QuestionFreeText(
-      question_name = "favorite_place_{{ activity }}", # optional use of scenario key
-      question_text = "In a brief sentence, describe your favorite place for {{ activity }}."
+    question_name = "favorite_place_{{ activity }}", # optional use of scenario key
+    question_text = "In a brief sentence, describe your favorite place for {{ activity }}."
   )
 
 
@@ -692,7 +793,7 @@ Looping the scenarios to create a lists of versions of the `enjoy` question:
 
 Output:
 
-.. code_block:: python 
+.. code_block:: text 
 
   [Question('linear_scale', question_name = """enjoy_reading""", question_text = """On a scale from 1 to 5, how much do you enjoy reading?""", question_options = [1, 2, 3, 4, 5], option_labels = {1: 'Not at all', 5: 'Very much'}),
   Question('linear_scale', question_name = """enjoy_running""", question_text = """On a scale from 1 to 5, how much do you enjoy running?""", question_options = [1, 2, 3, 4, 5], option_labels = {1: 'Not at all', 5: 'Very much'}),
@@ -709,7 +810,7 @@ Looping the scenarios to create a lists of versions of the `favorite_place` ques
 
 Output:
 
-.. code-block:: python 
+.. code-block:: text 
 
   [Question('free_text', question_name = """favorite_place_reading""", question_text = """In a brief sentence, describe your favorite place for reading."""),
   Question('free_text', question_name = """favorite_place_running""", question_text = """In a brief sentence, describe your favorite place for running."""),
@@ -735,110 +836,110 @@ We can see that there are additional question fields and no scenario fields:
 Output:
 
 .. list-table::
-  :header-rows: 1
+   :header-rows: 1
 
-  * - 
-    - 'agent.agent_instruction',
-    - 'agent.agent_name',
-    - 'agent.persona',
-    - 'answer.enjoy_reading',
-    - 'answer.enjoy_relaxing',
-    - 'answer.enjoy_running',
-    - 'answer.favorite_place_reading',
-    - 'answer.favorite_place_relaxing',
-    - 'answer.favorite_place_running',
-    - 'comment.enjoy_reading_comment',
-    - 'comment.enjoy_relaxing_comment',
-    - 'comment.enjoy_running_comment',
-    - 'comment.favorite_place_reading_comment',
-    - 'comment.favorite_place_relaxing_comment',
-    - 'comment.favorite_place_running_comment',
-    - 'generated_tokens.enjoy_reading_generated_tokens',
-    - 'generated_tokens.enjoy_relaxing_generated_tokens',
-    - 'generated_tokens.enjoy_running_generated_tokens',
-    - 'generated_tokens.favorite_place_reading_generated_tokens',
-    - 'generated_tokens.favorite_place_relaxing_generated_tokens',
-    - 'generated_tokens.favorite_place_running_generated_tokens',
-    - 'iteration.iteration',
-    - 'model.frequency_penalty',
-    - 'model.logprobs',
-    - 'model.maxOutputTokens',
-    - 'model.max_tokens',
-    - 'model.model',
-    - 'model.presence_penalty',
-    - 'model.stopSequences',
-    - 'model.temperature',
-    - 'model.topK',
-    - 'model.topP',
-    - 'model.top_logprobs',
-    - 'model.top_p',
-    - 'prompt.enjoy_reading_system_prompt',
-    - 'prompt.enjoy_reading_user_prompt',
-    - 'prompt.enjoy_relaxing_system_prompt',
-    - 'prompt.enjoy_relaxing_user_prompt',
-    - 'prompt.enjoy_running_system_prompt',
-    - 'prompt.enjoy_running_user_prompt',
-    - 'prompt.favorite_place_reading_system_prompt',
-    - 'prompt.favorite_place_reading_user_prompt',
-    - 'prompt.favorite_place_relaxing_system_prompt',
-    - 'prompt.favorite_place_relaxing_user_prompt',
-    - 'prompt.favorite_place_running_system_prompt',
-    - 'prompt.favorite_place_running_user_prompt',
-    - 'question_options.enjoy_reading_question_options',
-    - 'question_options.enjoy_relaxing_question_options',
-    - 'question_options.enjoy_running_question_options',
-    - 'question_options.favorite_place_reading_question_options',
-    - 'question_options.favorite_place_relaxing_question_options',
-    'question_options.favorite_place_running_question_options',
-    'question_text.enjoy_reading_question_text',
-    'question_text.enjoy_relaxing_question_text',
-    'question_text.enjoy_running_question_text',
-    'question_text.favorite_place_reading_question_text',
-    'question_text.favorite_place_relaxing_question_text',
-    'question_text.favorite_place_running_question_text',
-    'question_type.enjoy_reading_question_type',
-    'question_type.enjoy_relaxing_question_type',
-    'question_type.enjoy_running_question_type',
-    'question_type.favorite_place_reading_question_type',
-    'question_type.favorite_place_relaxing_question_type',
-    'question_type.favorite_place_running_question_type',
-    'raw_model_response.enjoy_reading_cost',
-    'raw_model_response.enjoy_reading_one_usd_buys',
-    'raw_model_response.enjoy_reading_raw_model_response',
-    'raw_model_response.enjoy_relaxing_cost',
-    'raw_model_response.enjoy_relaxing_one_usd_buys',
-    'raw_model_response.enjoy_relaxing_raw_model_response',
-    'raw_model_response.enjoy_running_cost',
-    'raw_model_response.enjoy_running_one_usd_buys',
-    'raw_model_response.enjoy_running_raw_model_response',
-    'raw_model_response.favorite_place_reading_cost',
-    'raw_model_response.favorite_place_reading_one_usd_buys',
-    'raw_model_response.favorite_place_reading_raw_model_response',
-    'raw_model_response.favorite_place_relaxing_cost',
-    'raw_model_response.favorite_place_relaxing_one_usd_buys',
-    'raw_model_response.favorite_place_relaxing_raw_model_response',
-    'raw_model_response.favorite_place_running_cost',
-    'raw_model_response.favorite_place_running_one_usd_buys',
-    'raw_model_response.favorite_place_running_raw_model_response']
+   * - 0
+   * - Fields
+   * - agent.agent_instruction
+   * - agent.agent_name
+   * - agent.persona
+   * - answer.enjoy_reading
+   * - answer.enjoy_relaxing
+   * - answer.enjoy_running
+   * - answer.favorite_place_reading
+   * - answer.favorite_place_relaxing
+   * - answer.favorite_place_running
+   * - comment.enjoy_reading_comment
+   * - comment.enjoy_relaxing_comment
+   * - comment.enjoy_running_comment
+   * - comment.favorite_place_reading_comment
+   * - comment.favorite_place_relaxing_comment
+   * - comment.favorite_place_running_comment
+   * - generated_tokens.enjoy_reading_generated_tokens
+   * - generated_tokens.enjoy_relaxing_generated_tokens
+   * - generated_tokens.enjoy_running_generated_tokens
+   * - generated_tokens.favorite_place_reading_generated_tokens
+   * - generated_tokens.favorite_place_relaxing_generated_tokens
+   * - generated_tokens.favorite_place_running_generated_tokens
+   * - iteration.iteration
+   * - model.frequency_penalty
+   * - model.logprobs
+   * - model.maxOutputTokens
+   * - model.max_tokens
+   * - model.model
+   * - model.presence_penalty
+   * - model.stopSequences
+   * - model.temperature
+   * - model.topK
+   * - model.topP
+   * - model.top_logprobs
+   * - model.top_p
+   * - prompt.enjoy_reading_system_prompt
+   * - prompt.enjoy_reading_user_prompt
+   * - prompt.enjoy_relaxing_system_prompt
+   * - prompt.enjoy_relaxing_user_prompt
+   * - prompt.enjoy_running_system_prompt
+   * - prompt.enjoy_running_user_prompt
+   * - prompt.favorite_place_reading_system_prompt
+   * - prompt.favorite_place_reading_user_prompt
+   * - prompt.favorite_place_relaxing_system_prompt
+   * - prompt.favorite_place_relaxing_user_prompt
+   * - prompt.favorite_place_running_system_prompt
+   * - prompt.favorite_place_running_user_prompt
+   * - question_options.enjoy_reading_question_options
+   * - question_options.enjoy_relaxing_question_options
+   * - question_options.enjoy_running_question_options
+   * - question_options.favorite_place_reading_question_options
+   * - question_options.favorite_place_relaxing_question_options
+   * - question_options.favorite_place_running_question_options
+   * - question_text.enjoy_reading_question_text
+   * - question_text.enjoy_relaxing_question_text
+   * - question_text.enjoy_running_question_text
+   * - question_text.favorite_place_reading_question_text
+   * - question_text.favorite_place_relaxing_question_text
+   * - question_text.favorite_place_running_question_text
+   * - question_type.enjoy_reading_question_type
+   * - question_type.enjoy_relaxing_question_type
+   * - question_type.enjoy_running_question_type
+   * - question_type.favorite_place_reading_question_type
+   * - question_type.favorite_place_relaxing_question_type
+   * - question_type.favorite_place_running_question_type
+   * - raw_model_response.enjoy_reading_cost
+   * - raw_model_response.enjoy_reading_one_usd_buys
+   * - raw_model_response.enjoy_reading_raw_model_response
+   * - raw_model_response.enjoy_relaxing_cost
+   * - raw_model_response.enjoy_relaxing_one_usd_buys
+   * - raw_model_response.enjoy_relaxing_raw_model_response
+   * - raw_model_response.enjoy_running_cost
+   * - raw_model_response.enjoy_running_one_usd_buys
+   * - raw_model_response.enjoy_running_raw_model_response
+   * - raw_model_response.favorite_place_reading_cost
+   * - raw_model_response.favorite_place_reading_one_usd_buys
+   * - raw_model_response.favorite_place_reading_raw_model_response
+   * - raw_model_response.favorite_place_relaxing_cost
+   * - raw_model_response.favorite_place_relaxing_one_usd_buys
+   * - raw_model_response.favorite_place_relaxing_raw_model_response
+   * - raw_model_response.favorite_place_running_cost
+   * - raw_model_response.favorite_place_running_one_usd_buys
+   * - raw_model_response.favorite_place_running_raw_model_response
 
 
 Here we inspect a subset of results:
 
 .. code-block:: python
 
-    (
-        results
-        .filter("model.model == 'gpt-4o'")
-        .sort_by("persona")
-        .select("persona", "enjoy_reading", "enjoy_running", "enjoy_relaxing", "favorite_place_reading", "favorite_place_running", "favorite_place_relaxing")
-        .print(format="rich")
-    )
+  (
+    results
+    .filter("model.model == 'gpt-4o'")
+    .sort_by("persona")
+    .select("persona", "enjoy_reading", "enjoy_running", "enjoy_relaxing", "favorite_place_reading", "favorite_place_running", "favorite_place_relaxing")
+  )
 
 
 Output:
 
 .. list-table::
-  :header-rows: 1
+   :header-rows: 1
 
   * - agent.persona
     - answer.enjoy_reading
@@ -878,27 +979,26 @@ For example, you can call the `to_pandas` method to convert results into a dataf
 
 .. code-block:: python 
     
-    df = results.to_pandas(remove_prefix=True)
-    # df # uncomment to view output
+  df = results.to_pandas(remove_prefix=True)
+  # df # uncomment to view output
 
 
 The `Results` object also supports SQL-like queries with the the `sql` method:
 
 .. code-block:: python 
 
-    results.sql("""
-    select model, persona, enjoy_reading, favorite_place_reading
-    from self
-    order by 1,2,3
-    """)
-
+  results.sql("""
+  select model, persona, enjoy_reading, favorite_place_reading
+  from self
+  order by 1,2,3
+  """)
 
 Output:
 
 .. code-block:: text 
 
 .. list-table::
-  :header-rows: 1
+   :header-rows: 1
 
   * - model
     - person

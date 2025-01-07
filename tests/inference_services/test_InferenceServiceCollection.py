@@ -10,8 +10,8 @@ from edsl.inference_services.InferenceServicesCollection import (
     InferenceServicesCollection,
     ModelResolver,
     ModelCreator,
-    InferenceService,
 )
+from edsl.inference_services.InferenceServiceABC import InferenceServiceABC
 
 
 class MockInferenceService:
@@ -34,7 +34,7 @@ class TestModelResolver:
     @pytest.fixture
     def mock_fetcher(self):
         fetcher = Mock()
-        fetcher.get_available_models_by_service.return_value = ["model2"]
+        fetcher.get_available_models_by_service.return_value = "model2", "fake_serivce"
         return fetcher
 
     @pytest.fixture
@@ -88,13 +88,13 @@ class TestInferenceServicesCollection:
         expected_result = [("service1", "model1", 1), ("service2", "model2", 1)]
         collection.availability_fetcher.available = Mock(return_value=expected_result)
 
-        result = collection.available()
+        result = collection.available("service1")
         assert result == expected_result
 
     def test_reset_cache(self, collection):
         collection.available("service1")  # Cache a result
         collection.reset_cache()
-        assert collection.available.cache_info().currsize == 0
+        assert collection.num_cache_entries == 0
 
     def test_register(self, collection):
         new_service = MockInferenceService("service3")
@@ -110,3 +110,23 @@ class TestInferenceServicesCollection:
     def test_create_model_factory_invalid_service(self, collection):
         with pytest.raises(InferenceServiceError):
             collection.create_model_factory("model1", "invalid_service")
+
+    def test_literal_matches_enum(self):
+        # Get all values from the Literal type
+        from typing import Literal, get_args
+        from edsl.inference_services.InferenceServicesCollection import (
+            InferenceServiceLiteral,
+        )
+        from edsl.enums import InferenceServiceType
+
+        literal_values = set(get_args(InferenceServiceLiteral))
+
+        # Get all values from the enum
+        enum_values = {member.value for member in InferenceServiceType}
+
+        # Check both directions to ensure complete equality
+        assert literal_values == enum_values, (
+            f"Mismatch between Literal and Enum values:\n"
+            f"In Literal but not in Enum: {literal_values - enum_values}\n"
+            f"In Enum but not in Literal: {enum_values - literal_values}"
+        )

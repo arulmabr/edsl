@@ -5,12 +5,12 @@ import copy
 import os
 import json
 from collections import UserDict
-from typing import Union, List, Optional, TYPE_CHECKING
+from typing import Union, List, Optional, TYPE_CHECKING, Collection
 from uuid import uuid4
 
 from edsl.Base import Base
 from edsl.scenarios.ScenarioHtmlMixin import ScenarioHtmlMixin
-from edsl.utilities.decorators import remove_edsl_version
+from edsl.utilities.remove_edsl_version import remove_edsl_version
 from edsl.exceptions.scenarios import ScenarioError
 
 if TYPE_CHECKING:
@@ -19,18 +19,22 @@ if TYPE_CHECKING:
 
 
 class DisplayJSON:
-    def __init__(self, dict):
-        self.text = json.dumps(dict, indent=4)
+    """Display a dictionary as JSON."""
+
+    def __init__(self, input_dict: dict):
+        self.text = json.dumps(input_dict, indent=4)
 
     def __repr__(self):
         return self.text
 
 
 class DisplayYAML:
-    def __init__(self, dict):
+    """Display a dictionary as YAML."""
+
+    def __init__(self, input_dict: dict):
         import yaml
 
-        self.text = yaml.dump(dict)
+        self.text = yaml.dump(input_dict)
 
     def __repr__(self):
         return self.text
@@ -41,7 +45,7 @@ class Scenario(Base, UserDict, ScenarioHtmlMixin):
 
     __documentation__ = "https://docs.expectedparrot.com/en/latest/scenarios.html"
 
-    def __init__(self, data: Optional[dict] = None, name: str = None):
+    def __init__(self, data: Optional[dict] = None, name: Optional[str] = None):
         """Initialize a new Scenario.
 
         :param data: A dictionary of keys/values for parameterizing questions.
@@ -52,9 +56,11 @@ class Scenario(Base, UserDict, ScenarioHtmlMixin):
                 data = dict(data)
             except Exception as e:
                 raise ScenarioError(
-                    f"You must pass in a dictionary to initialize a Scenario. You passed in {data}"
+                    f"You must pass in a dictionary to initialize a Scenario. You passed in {data}",
+                    "Exception message:" + str(e),
                 )
 
+        super().__init__()
         self.data = data if data is not None else {}
         self.name = name
 
@@ -64,7 +70,6 @@ class Scenario(Base, UserDict, ScenarioHtmlMixin):
         :param n: The number of times to replicate the scenario.
 
         Example:
-
         >>> s = Scenario({"food": "wood chips"})
         >>> s.replicate(2)
         ScenarioList([Scenario({'food': 'wood chips'}), Scenario({'food': 'wood chips'})])
@@ -87,13 +92,13 @@ class Scenario(Base, UserDict, ScenarioHtmlMixin):
                     return True
         return False
 
-    def convert_jinja_braces(
+    def _convert_jinja_braces(
         self, replacement_left: str = "<<", replacement_right: str = ">>"
     ) -> Scenario:
         """Convert Jinja braces to some other character.
 
         >>> s = Scenario({"food": "I love {{wood chips}}"})
-        >>> s.convert_jinja_braces()
+        >>> s._convert_jinja_braces()
         Scenario({'food': 'I love <<wood chips>>'})
 
         """
@@ -132,11 +137,14 @@ class Scenario(Base, UserDict, ScenarioHtmlMixin):
             return s
 
     def rename(
-        self, old_name_or_replacement_dict: dict, new_name: Optional[str] = None
+        self,
+        old_name_or_replacement_dict: Union[str, dict[str, str]],
+        new_name: Optional[str] = None,
     ) -> Scenario:
         """Rename the keys of a scenario.
 
-        :param replacement_dict: A dictionary of old keys to new keys.
+        :param old_name_or_replacement_dict: A dictionary of old keys to new keys *OR* a string of the old key.
+        :param new_name: The new name of the key.
 
         Example:
 
@@ -190,7 +198,7 @@ class Scenario(Base, UserDict, ScenarioHtmlMixin):
 
         return DisplayYAML(self.to_dict(add_edsl_version=False))
 
-    def to_dict(self, add_edsl_version=True) -> dict:
+    def to_dict(self, add_edsl_version: bool = True) -> dict:
         """Convert a scenario to a dictionary.
 
         Example:
@@ -218,8 +226,7 @@ class Scenario(Base, UserDict, ScenarioHtmlMixin):
         return d
 
     def __hash__(self) -> int:
-        """
-        Return a hash of the scenario.
+        """Return a hash of the scenario.
 
         Example:
 
@@ -247,7 +254,7 @@ class Scenario(Base, UserDict, ScenarioHtmlMixin):
         values = list(self.values())
         return Dataset([{"key": keys}, {"value": values}])
 
-    def select(self, list_of_keys: List[str]) -> "Scenario":
+    def select(self, list_of_keys: Collection[str]) -> "Scenario":
         """Select a subset of keys from a scenario.
 
         :param list_of_keys: The keys to select.
@@ -263,7 +270,7 @@ class Scenario(Base, UserDict, ScenarioHtmlMixin):
             new_scenario[key] = self[key]
         return new_scenario
 
-    def drop(self, list_of_keys: List[str]) -> "Scenario":
+    def drop(self, list_of_keys: Collection[str]) -> "Scenario":
         """Drop a subset of keys from a scenario.
 
         :param list_of_keys: The keys to drop.
@@ -348,10 +355,10 @@ class Scenario(Base, UserDict, ScenarioHtmlMixin):
         return cls.from_file(image_path, image_name)
 
     @classmethod
-    def from_pdf(cls, pdf_path):
+    def from_pdf(cls, pdf_path: str):
         from edsl.scenarios.PdfExtractor import PdfExtractor
 
-        return PdfExtractor(pdf_path, self).get_object()
+        return PdfExtractor(pdf_path, cls).get_object()
 
     @classmethod
     def from_docx(cls, docx_path: str) -> "Scenario":
@@ -451,7 +458,11 @@ class Scenario(Base, UserDict, ScenarioHtmlMixin):
         return cls(d)
 
     def _table(self) -> tuple[dict, list]:
-        """Prepare generic table data."""
+        """Prepare generic table data.
+        >>> s = Scenario({"food": "wood chips"})
+        >>> s._table()
+        ([{'Attribute': 'data', 'Value': "{'food': 'wood chips'}"}, {'Attribute': 'name', 'Value': 'None'}], ['Attribute', 'Value'])
+        """
         table_data = []
         for attr_name, attr_value in self.__dict__.items():
             table_data.append({"Attribute": attr_name, "Value": repr(attr_value)})
@@ -459,21 +470,18 @@ class Scenario(Base, UserDict, ScenarioHtmlMixin):
         return table_data, column_names
 
     @classmethod
-    def example(cls, randomize: bool = False, has_image=False) -> Scenario:
+    def example(cls, randomize: bool = False) -> Scenario:
         """
         Returns an example Scenario instance.
 
         :param randomize: If True, adds a random string to the value of the example key.
         """
-        if not has_image:
-            addition = "" if not randomize else str(uuid4())
-            return cls(
-                {
-                    "persona": f"A reseacher studying whether LLMs can be used to generate surveys.{addition}",
-                }
-            )
-        else:
-            return cls.from_image(cls.example_image())
+        addition = "" if not randomize else str(uuid4())
+        return cls(
+            {
+                "persona": f"A reseacher studying whether LLMs can be used to generate surveys.{addition}",
+            }
+        )
 
     def code(self) -> List[str]:
         """Return the code for the scenario."""

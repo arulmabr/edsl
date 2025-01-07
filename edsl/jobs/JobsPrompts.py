@@ -25,7 +25,7 @@ class JobsPrompts:
     @property
     def price_lookup(self):
         if self._price_lookup is None:
-            from edsl import Coop
+            from edsl.coop.coop import Coop
 
             c = Coop()
             self._price_lookup = c.fetch_prices()
@@ -51,7 +51,7 @@ class JobsPrompts:
         for interview_index, interview in enumerate(interviews):
             invigilators = [
                 FetchInvigilator(interview)(question)
-                for question in self.survey.questions
+                for question in interview.survey.questions
             ]
             for _, invigilator in enumerate(invigilators):
                 prompts = invigilator.get_prompts()

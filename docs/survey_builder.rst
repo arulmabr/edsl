@@ -3,38 +3,85 @@
 Survey Builder
 ==============
 
-**This page is under construction.** Please check back for updates.
+*Interested in testing new features for Survey Builder?*
+*Send us a message at info@expectedparrot.com and we will enable beta features and add credits to your account!*
 
 
 Overview
 --------
 
-Survey Builder is a web-based application for constructing and launching surveys that can be administered to humans and/or AI agents.
-It is fully integrated with EDSL and the Coop, allowing you to access survey contents, agents and results directly from the Coop.
+Survey Builder is a user-friendly, no-code application for launching surveys and gathering responses from both human respondents and AI agents. 
+It is fully integrated with EDSL and available at your Coop account, allowing you to seamlessly design questions and agents, and analyze, visualize and share your results.
 
-*Survey Builder* is currently in beta and available to users who have activated beta features on the Coop.
 
 Features
 --------
 
-- **Survey creation**: Select from a variety of question types to build surveys, such as multiple choice, free text, linear scale and others.
-- **Agent selection**: Design AI agents with relevant traits to respond to survey questions.
-- **Using data**: Import data to dynamically parameterize survey questions.
-- **Survey deployment**: Launch surveys for human and AI respondents.
-- **Results analysis**: Access and analyze survey results with built-in tools.
-- **Coop integration**: Store and share survey contents, agents, and results on the Coop.
+- **Survey creation**: Build customized surveys using a wide range of question types, including multiple choice, free text, linear scale, matrix, numerical and more.
+- **AI agent design**: Create and configure AI agent personas to respond to your questions. 
+- **Dynamic data integration**: Import data from Coop and other sources to dynamically parameterize your surveys.
+- **Seamless deployment**: Easily launch surveys with both human and AI respondents.
+- **Results analysis**: Leverage built-in tools to visualize and analyze responses, combining human and AI data for greater insights.
+- **Team collaboration**: Share surveys, agents, results and projects with your team with tools for streamlined sharing and collaboration.
 
 
 Getting started 
 ---------------
 
-1. **Create a Coop account**: Sign up for a `Coop account <https://www.expectedparrot.com/login>`_.
+1. Log into your Coop account
+    Sign in or create an account `here <https://www.expectedparrot.com/login>`_.
 
-2. **Activate beta features**: Navigate to your Profile page and select the option to activate beta features.
+2. Create a survey
+    Navigate to the *Create* page and choose whether to create a new survey or create a project using an existing survey at Coop. 
+    Access features for creating and modifying questions, adding survey logic, designing AI agents and sharing your web-based survey.
+    
+    See videos below for a quick overview of the survey creation process.
 
-3. **Create a survey**: Navigate to the "Create" page to build a survey.
+3. Analyze results
+    View and analyze survey responses in real-time, and export data for further analysis.
 
-4. **Deploy the survey**: Navigate to the "Project" page to deploy the survey for human and AI respondents.
+
+
+Create a survey
+^^^^^^^^^^^^^^^
+
+Log into your Coop account and navigate to the "Create" page to start building your survey.
+Select "Create new survey" to design a survey from scratch or "Create project" to use an existing survey as a template for a new project.
+Add questions, configure survey logic, design AI agents and share your survey with your target audience.
+
+.. raw:: html
+
+    <iframe width="560" height="315" src="https://www.youtube.com/embed/Ed4gRNPqlGE" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+
+    <br><br>
+
+
+Human responses
+^^^^^^^^^^^^^^^
+
+Select "Survey preview" to test your survey and see how it will look to respondents.
+Share the URL for the web-based survey with your target audience to collect responses.
+Recorded responses will be displayed in the "Human responses" tab, where you can view and analyze them in real-time.
+
+.. raw:: html
+
+    <iframe width="560" height="315" src="https://www.youtube.com/embed/-rnRPjxqCKk" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+
+    <br><br>
+
+
+Agent responses 
+^^^^^^^^^^^^^^^
+
+Create AI agents to respond to your survey questions.
+Navigate to your survey "Jobs" tab and select "Run with agents" to see options for running the survey with AI agents.
+Recorded responses will be displayed in the "Agent responses" tab, where you can view and analyze them in real-time.
+
+.. raw:: html
+
+    <iframe width="560" height="315" src="https://www.youtube.com/embed/U8AoQydWR-0" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+
+    <br><br><br>
 
 
 Questions

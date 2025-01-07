@@ -6,12 +6,10 @@ from __future__ import annotations
 import json
 import os
 import warnings
-import copy
-from typing import Optional, Union
+from typing import Optional, Union, TYPE_CHECKING
 from edsl.Base import Base
-from edsl.data.CacheEntry import CacheEntry
-from edsl.utilities.utilities import dict_hash
-from edsl.utilities.decorators import remove_edsl_version
+
+from edsl.utilities.remove_edsl_version import remove_edsl_version
 from edsl.exceptions.cache import CacheError
 
 
@@ -82,10 +80,6 @@ class Cache(Base):
                 raise CacheError("Invalid file extension. Must be .jsonl or .db")
 
         self._perform_checks()
-
-    def rich_print(sefl):
-        pass
-        # raise NotImplementedError("This method is not implemented yet.")
 
     def code(sefl):
         pass
@@ -201,6 +195,7 @@ class Cache(Base):
         >>> len(c)
         1
         """
+        from edsl.data.CacheEntry import CacheEntry
 
         entry = CacheEntry(
             model=model,
@@ -226,6 +221,7 @@ class Cache(Base):
 
         :param write_now: Whether to write to the cache immediately (similar to `immediate_write`).
         """
+        from edsl.data.CacheEntry import CacheEntry
 
         for key, value in new_data.items():
             if key in self.data:
@@ -246,6 +242,8 @@ class Cache(Base):
 
         :param write_now: Whether to write to the cache immediately (similar to `immediate_write`).
         """
+        from edsl.data.CacheEntry import CacheEntry
+
         with open(filename, "a+") as f:
             f.seek(0)
             lines = f.readlines()
@@ -289,8 +287,8 @@ class Cache(Base):
 
         CACHE_PATH = CONFIG.get("EDSL_DATABASE_PATH")
         path = CACHE_PATH.replace("sqlite:///", "")
-        db_path = os.path.join(os.path.dirname(path), "data.db")
-        return cls.from_sqlite_db(db_path=db_path)
+        # db_path = os.path.join(os.path.dirname(path), "data.db")
+        return cls.from_sqlite_db(path)
 
     @classmethod
     def from_jsonl(cls, jsonlfile: str, db_path: Optional[str] = None) -> Cache:
@@ -353,7 +351,8 @@ class Cache(Base):
                 f.write(json.dumps({key: value.to_dict()}) + "\n")
 
     def to_scenario_list(self):
-        from edsl import ScenarioList, Scenario
+        from edsl.scenarios.ScenarioList import ScenarioList
+        from edsl.scenarios.Scenario import Scenario
 
         scenarios = []
         for key, value in self.data.items():
@@ -363,12 +362,32 @@ class Cache(Base):
             scenarios.append(s)
         return ScenarioList(scenarios)
 
-    ####################
-    # REMOTE
-    ####################
-    # TODO: Make this work
-    # - Need to decide whether the cache belongs to a user and what can be shared
-    # - I.e., some cache entries? all or nothing?
+    def __floordiv__(self, other: "Cache") -> "Cache":
+        """
+        Return a new Cache containing entries that are in self but not in other.
+        Uses // operator as alternative to subtraction.
+
+        :param other: Another Cache object to compare against
+        :return: A new Cache object containing unique entries
+
+        >>> from edsl.data.CacheEntry import CacheEntry
+        >>> ce1 = CacheEntry.example(randomize = True)
+        >>> ce2 = CacheEntry.example(randomize = True)
+        >>> ce2 = CacheEntry.example(randomize = True)
+        >>> c1 = Cache(data={ce1.key: ce1, ce2.key: ce2})
+        >>> c2 = Cache(data={ce1.key: ce1})
+        >>> c3 = c1 // c2
+        >>> len(c3)
+        1
+        >>> c3.data[ce2.key] == ce2
+        True
+        """
+        if not isinstance(other, Cache):
+            raise CacheError("Can only compare two caches")
+
+        diff_data = {k: v for k, v in self.data.items() if k not in other.data}
+        return Cache(data=diff_data, immediate_write=self.immediate_write)
+
     @classmethod
     def from_url(cls, db_path=None) -> Cache:
         """
@@ -394,11 +413,10 @@ class Cache(Base):
         if self.filename:
             self.write(self.filename)
 
-    ####################
-    # DUNDER / USEFUL
-    ####################
     def __hash__(self):
         """Return the hash of the Cache."""
+        from edsl.utilities.utilities import dict_hash
+
         return dict_hash(self.to_dict(add_edsl_version=False))
 
     def to_dict(self, add_edsl_version=True) -> dict:
@@ -437,6 +455,8 @@ class Cache(Base):
     @remove_edsl_version
     def from_dict(cls, data) -> Cache:
         """Construct a Cache from a dictionary."""
+        from edsl.data.CacheEntry import CacheEntry
+
         newdata = {k: CacheEntry.from_dict(v) for k, v in data.items()}
         return cls(data=newdata)
 
@@ -479,6 +499,8 @@ class Cache(Base):
         """
         Create an example input for a 'fetch' operation.
         """
+        from edsl.data.CacheEntry import CacheEntry
+
         return CacheEntry.fetch_input_example()
 
     def to_html(self):
@@ -535,6 +557,8 @@ class Cache(Base):
 
         :param randomize: If True, uses CacheEntry's randomize method.
         """
+        from edsl.data.CacheEntry import CacheEntry
+
         return cls(
             data={
                 CacheEntry.example(randomize).key: CacheEntry.example(),

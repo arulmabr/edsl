@@ -2,30 +2,44 @@
 
 from __future__ import annotations
 import asyncio
-from typing import Any, Type, List, Generator, Optional, Union
+from typing import Any, Type, List, Generator, Optional, Union, TYPE_CHECKING
 import copy
+from dataclasses import dataclass
 
-from edsl import CONFIG
-
-from edsl.jobs.Answers import Answers
+# from edsl.jobs.Answers import Answers
+from edsl.jobs.data_structures import Answers
 from edsl.jobs.interviews.InterviewStatusLog import InterviewStatusLog
 from edsl.jobs.interviews.InterviewStatusDictionary import InterviewStatusDictionary
 from edsl.jobs.interviews.InterviewExceptionCollection import (
     InterviewExceptionCollection,
 )
 from edsl.jobs.interviews.InterviewExceptionEntry import InterviewExceptionEntry
-
 from edsl.jobs.buckets.ModelBuckets import ModelBuckets
-from edsl import Agent, Survey, Scenario, Cache
-from edsl.language_models import LanguageModel
-
-from edsl.jobs.tokens.InterviewTokenUsage import InterviewTokenUsage
 from edsl.jobs.AnswerQuestionFunctionConstructor import (
     AnswerQuestionFunctionConstructor,
 )
 from edsl.jobs.InterviewTaskManager import InterviewTaskManager
 from edsl.jobs.FetchInvigilator import FetchInvigilator
 from edsl.jobs.RequestTokenEstimator import RequestTokenEstimator
+
+
+if TYPE_CHECKING:
+    from edsl.agents.Agent import Agent
+    from edsl.surveys.Survey import Survey
+    from edsl.scenarios.Scenario import Scenario
+    from edsl.data.Cache import Cache
+    from edsl.language_models.LanguageModel import LanguageModel
+    from edsl.jobs.tokens.InterviewTokenUsage import InterviewTokenUsage
+    from edsl.agents.InvigilatorBase import InvigilatorBase
+    from edsl.language_models.key_management.KeyLookup import KeyLookup
+
+
+@dataclass
+class InterviewRunningConfig:
+    cache: Optional["Cache"] = (None,)
+    skip_retry: bool = (False,)  # COULD BE SET WITH CONFIG
+    raise_validation_errors: bool = (True,)
+    stop_on_exception: bool = (False,)
 
 
 class Interview:
@@ -42,13 +56,11 @@ class Interview:
         survey: Survey,
         scenario: Scenario,
         model: Type["LanguageModel"],
-        debug: Optional[bool] = False,  # DEPRECATE
         iteration: int = 0,
+        indices: dict = None,  # explain?
         cache: Optional["Cache"] = None,
-        sidecar_model: Optional["LanguageModel"] = None,  # DEPRECATE
         skip_retry: bool = False,  # COULD BE SET WITH CONFIG
         raise_validation_errors: bool = True,
-        indices: dict = None,  # explain?
     ):
         """Initialize the Interview instance.
 
@@ -56,10 +68,9 @@ class Interview:
         :param survey: the survey being administered to the agent.
         :param scenario: the scenario that populates the survey questions.
         :param model: the language model used to answer the questions.
-        :param debug: if True, run without calls to the language model.
+        # :param debug: if True, run without calls to the language model.
         :param iteration: the iteration number of the interview.
         :param cache: the cache used to store the answers.
-        :param sidecar_model: a sidecar model used to answer questions.
 
         >>> i = Interview.example()
         >>> i.task_manager.task_creators
@@ -80,12 +91,9 @@ class Interview:
         self.survey = copy.deepcopy(survey)  # why do we need to deepcopy the survey?
         self.scenario = scenario
         self.model = model
-        self.debug = debug
         self.iteration = iteration
-        self.cache = cache
 
         self.answers = Answers()  # will get filled in as interview progresses
-        self.sidecar_model = sidecar_model
 
         self.task_manager = InterviewTaskManager(
             survey=self.survey,
@@ -94,6 +102,13 @@ class Interview:
 
         self.exceptions = InterviewExceptionCollection()
 
+        self.running_config = InterviewRunningConfig(
+            cache=cache,
+            skip_retry=skip_retry,
+            raise_validation_errors=raise_validation_errors,
+        )
+
+        self.cache = cache
         self.skip_retry = skip_retry
         self.raise_validation_errors = raise_validation_errors
 
@@ -106,6 +121,7 @@ class Interview:
         self.failed_questions = []
 
         self.indices = indices
+        self.initial_hash = hash(self)
 
     @property
     def has_exceptions(self) -> bool:
@@ -131,7 +147,6 @@ class Interview:
         # return self.task_creators.interview_status
         return self.task_manager.interview_status
 
-    # region: Serialization
     def to_dict(self, include_exceptions=True, add_edsl_version=True) -> dict[str, Any]:
         """Return a dictionary representation of the Interview instance.
         This is just for hashing purposes.
@@ -157,6 +172,12 @@ class Interview:
     @classmethod
     def from_dict(cls, d: dict[str, Any]) -> "Interview":
         """Return an Interview instance from a dictionary."""
+
+        from edsl.agents.Agent import Agent
+        from edsl.surveys.Survey import Survey
+        from edsl.scenarios.Scenario import Scenario
+        from edsl.language_models.LanguageModel import LanguageModel
+
         agent = Agent.from_dict(d["agent"])
         survey = Survey.from_dict(d["survey"])
         scenario = Scenario.from_dict(d["scenario"])
@@ -189,13 +210,13 @@ class Interview:
         """
         return hash(self) == hash(other)
 
-    # region: Conducting the interview
     async def async_conduct_interview(
         self,
-        model_buckets: Optional[ModelBuckets] = None,
-        stop_on_exception: bool = False,
-        sidecar_model: Optional["LanguageModel"] = None,
-        raise_validation_errors: bool = True,
+        run_config: Optional["RunConfig"] = None,
+        #     model_buckets: Optional[ModelBuckets] = None,
+        #     stop_on_exception: bool = False,
+        #     raise_validation_errors: bool = True,
+        #     key_lookup: Optional[KeyLookup] = None,
     ) -> tuple["Answers", List[dict[str, Any]]]:
         """
         Conduct an Interview asynchronously.
@@ -204,7 +225,6 @@ class Interview:
         :param model_buckets: a dictionary of token buckets for the model.
         :param debug: run without calls to LLM.
         :param stop_on_exception: if True, stops the interview if an exception is raised.
-        :param sidecar_model: a sidecar model used to answer questions.
 
         Example usage:
 
@@ -218,23 +238,39 @@ class Interview:
         >>> i.exceptions
         {'q0': ...
         >>> i = Interview.example()
-        >>> result, _ = asyncio.run(i.async_conduct_interview(stop_on_exception = True))
+        >>> from edsl.jobs.Jobs import RunConfig, RunParameters, RunEnvironment
+        >>> run_config = RunConfig(parameters = RunParameters(), environment = RunEnvironment())
+        >>> run_config.parameters.stop_on_exception = True
+        >>> result, _ = asyncio.run(i.async_conduct_interview(run_config))
         Traceback (most recent call last):
         ...
         asyncio.exceptions.CancelledError
         """
-        self.sidecar_model = sidecar_model
-        self.stop_on_exception = stop_on_exception
+        from edsl.jobs.Jobs import RunConfig, RunParameters, RunEnvironment
+
+        if run_config is None:
+            run_config = RunConfig(
+                parameters=RunParameters(),
+                environment=RunEnvironment(),
+            )
+        self.stop_on_exception = run_config.parameters.stop_on_exception
 
         # if no model bucket is passed, create an 'infinity' bucket with no rate limits
+        bucket_collection = run_config.environment.bucket_collection
+
+        if bucket_collection:
+            model_buckets = bucket_collection.get(self.model)
+        else:
+            model_buckets = None
+
         if model_buckets is None or hasattr(self.agent, "answer_question_directly"):
             model_buckets = ModelBuckets.infinity_bucket()
 
         # was "self.tasks" - is that necessary?
         self.tasks = self.task_manager.build_question_tasks(
             answer_func=AnswerQuestionFunctionConstructor(
-                self
-            )(),  # self._answer_question_and_record_task,
+                self, key_lookup=run_config.environment.key_lookup
+            )(),
             token_estimator=RequestTokenEstimator(self),
             model_buckets=model_buckets,
         )
@@ -243,23 +279,26 @@ class Interview:
         ## with dependencies on the questions that must be answered before this one can be answered.
 
         ## 'Invigilators' are used to administer the survey.
-        self.invigilators = [
-            FetchInvigilator(interview=self, current_answers=self.answers)(question)
-            for question in self.survey.questions
-        ]
-        await asyncio.gather(*self.tasks, return_exceptions=not stop_on_exception)
+        fetcher = FetchInvigilator(
+            interview=self,
+            current_answers=self.answers,
+            key_lookup=run_config.environment.key_lookup,
+        )
+        self.invigilators = [fetcher(question) for question in self.survey.questions]
+        await asyncio.gather(
+            *self.tasks, return_exceptions=not run_config.parameters.stop_on_exception
+        )
         self.answers.replace_missing_answers_with_none(self.survey)
         valid_results = list(
             self._extract_valid_results(self.tasks, self.invigilators, self.exceptions)
         )
         return self.answers, valid_results
 
-    # endregion
-
-    # region: Extracting results and recording errors
     @staticmethod
     def _extract_valid_results(
-        tasks, invigilators, exceptions
+        tasks: List["asyncio.Task"],
+        invigilators: List["InvigilatorBase"],
+        exceptions: InterviewExceptionCollection,
     ) -> Generator["Answers", None, None]:
         """Extract the valid results from the list of results.
 
@@ -272,10 +311,7 @@ class Interview:
         """
         assert len(tasks) == len(invigilators)
 
-        for task, invigilator in zip(tasks, invigilators):
-            if not task.done():
-                raise ValueError(f"Task {task.get_name()} is not done.")
-
+        def handle_task(task, invigilator):
             try:
                 result = task.result()
             except asyncio.CancelledError as e:  # task was cancelled
@@ -291,18 +327,21 @@ class Interview:
                     invigilator=invigilator,
                 )
                 exceptions.add(task.get_name(), exception_entry)
-                # self.exceptions.add(task.get_name(), exception_entry)
+            return result
 
-            yield result
+        for task, invigilator in zip(tasks, invigilators):
+            if not task.done():
+                raise ValueError(f"Task {task.get_name()} is not done.")
 
-    # endregion
+            yield handle_task(task, invigilator)
 
-    # region: Magic methods
     def __repr__(self) -> str:
         """Return a string representation of the Interview instance."""
         return f"Interview(agent = {repr(self.agent)}, survey = {repr(self.survey)}, scenario = {repr(self.scenario)}, model = {repr(self.model)})"
 
-    def duplicate(self, iteration: int, cache: "Cache") -> Interview:
+    def duplicate(
+        self, iteration: int, cache: "Cache", randomize_survey: Optional[bool] = True
+    ) -> Interview:
         """Duplicate the interview, but with a new iteration number and cache.
 
         >>> i = Interview.example()
@@ -311,14 +350,19 @@ class Interview:
         True
 
         """
+        if randomize_survey:
+            new_survey = self.survey.draw()
+        else:
+            new_survey = self.survey
+
         return Interview(
             agent=self.agent,
-            survey=self.survey,
+            survey=new_survey,
             scenario=self.scenario,
             model=self.model,
             iteration=iteration,
-            cache=cache,
-            skip_retry=self.skip_retry,
+            cache=self.running_config.cache,
+            skip_retry=self.running_config.skip_retry,
             indices=self.indices,
         )
 

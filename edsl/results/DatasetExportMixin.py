@@ -1,11 +1,11 @@
 """Mixin class for exporting results."""
 
-import base64
-import csv
 import io
-import html
+import warnings
+import textwrap
 from typing import Optional, Tuple, Union, List
-from openpyxl import Workbook
+
+from edsl.results.file_exports import CSVExport, ExcelExport, JSONLExport, SQLiteExport
 
 
 class DatasetExportMixin:
@@ -71,7 +71,7 @@ class DatasetExportMixin:
     def num_observations(self):
         """Return the number of observations in the dataset.
 
-        >>> from edsl.results import Results
+        >>> from edsl.results.Results import Results
         >>> Results.example().num_observations()
         4
         """
@@ -164,79 +164,44 @@ class DatasetExportMixin:
             remove_prefix=remove_prefix, pretty_labels=pretty_labels
         )
 
-    def to_jsonl(self, filename: Optional[str] = None) -> "FileStore":
-        """Export the results to a FileStore instance containing JSONL data.
+    def to_jsonl(self, filename: Optional[str] = None) -> Optional["FileStore"]:
+        """Export the results to a FileStore instance containing JSONL data."""
+        exporter = JSONLExport(data=self, filename=filename)
+        return exporter.export()
 
-        Args:
-            filename: Optional filename for the JSONL file (defaults to "results.jsonl")
-
-        Returns:
-            FileStore: Instance containing the JSONL data
-        """
-        if filename is None:
-            filename = "results.jsonl"
-
-        # Write to string buffer
-        output = io.StringIO()
-        for entry in self:
-            key, values = list(entry.items())[0]
-            output.write(f'{{"{key}": {values}}}\n')
-
-        # Get the CSV string and encode to base64
-        jsonl_string = output.getvalue()
-        base64_string = base64.b64encode(jsonl_string.encode()).decode()
-        from edsl.scenarios.FileStore import FileStore
-
-        return FileStore(
-            path=filename,
-            mime_type="application/jsonl",
-            binary=False,
-            suffix="jsonl",
-            base64_string=base64_string,
+    def to_sqlite(
+        self,
+        filename: Optional[str] = None,
+        remove_prefix: bool = False,
+        pretty_labels: Optional[dict] = None,
+        table_name: str = "results",
+        if_exists: str = "replace",
+    ) -> Optional["FileStore"]:
+        """Export the results to a SQLite database file."""
+        exporter = SQLiteExport(
+            data=self,
+            filename=filename,
+            remove_prefix=remove_prefix,
+            pretty_labels=pretty_labels,
+            table_name=table_name,
+            if_exists=if_exists,
         )
+        return exporter.export()
 
     def to_csv(
         self,
         filename: Optional[str] = None,
         remove_prefix: bool = False,
         pretty_labels: Optional[dict] = None,
-    ) -> "FileStore":
-        """Export the results to a FileStore instance containing CSV data.
-
-        Args:
-            filename: Optional filename for the CSV (defaults to "results.csv")
-            remove_prefix: Whether to remove the prefix from column names
-            pretty_labels: Dictionary mapping original column names to pretty labels
-
-        Returns:
-            FileStore: Instance containing the CSV data
-        """
-        if filename is None:
-            filename = "results.csv"
-
-        # Get the tabular data
-        header, rows = self._get_tabular_data(
-            remove_prefix=remove_prefix, pretty_labels=pretty_labels
+    ) -> Optional["FileStore"]:
+        """Export the results to a FileStore instance containing CSV data."""
+        exporter = CSVExport(
+            data=self,
+            filename=filename,
+            remove_prefix=remove_prefix,
+            pretty_labels=pretty_labels,
         )
-
-        # Write to string buffer
-        output = io.StringIO()
-        writer = csv.writer(output)
-        writer.writerow(header)
-        writer.writerows(rows)
-
-        # Get the CSV string and encode to base64
-        csv_string = output.getvalue()
-        base64_string = base64.b64encode(csv_string.encode()).decode()
-        from edsl.scenarios.FileStore import FileStore
-
-        return FileStore(
-            path=filename,
-            mime_type="text/csv",
-            binary=False,
-            suffix="csv",
-            base64_string=base64_string,
-        )
+        return exporter.export()
 
     def to_excel(
         self,
@@ -244,58 +209,16 @@ class DatasetExportMixin:
         remove_prefix: bool = False,
         pretty_labels: Optional[dict] = None,
         sheet_name: Optional[str] = None,
-    ) -> "FileStore":
-        """Export the results to a FileStore instance containing Excel data.
-
-        Args:
-            filename: Optional filename for the Excel file (defaults to "results.xlsx")
-            remove_prefix: Whether to remove the prefix from column names
-            pretty_labels: Dictionary mapping original column names to pretty labels
-            sheet_name: Name of the worksheet (defaults to "Results")
-
-        Returns:
-            FileStore: Instance containing the Excel data
-        """
-        if filename is None:
-            filename = "results.xlsx"
-        if sheet_name is None:
-            sheet_name = "Results"
-
-        # Get the tabular data
-        header, rows = self._get_tabular_data(
-            remove_prefix=remove_prefix, pretty_labels=pretty_labels
+    ) -> Optional["FileStore"]:
+        """Export the results to a FileStore instance containing Excel data."""
+        exporter = ExcelExport(
+            data=self,
+            filename=filename,
+            remove_prefix=remove_prefix,
+            pretty_labels=pretty_labels,
+            sheet_name=sheet_name,
         )
-
-        # Create Excel workbook in memory
-        wb = Workbook()
-        ws = wb.active
-        ws.title = sheet_name
-
-        # Write header
-        for col, value in enumerate(header, 1):
-            ws.cell(row=1, column=col, value=value)
-
-        # Write data rows
-        for row_idx, row_data in enumerate(rows, 2):
-            for col, value in enumerate(row_data, 1):
-                ws.cell(row=row_idx, column=col, value=value)
-
-        # Save to bytes buffer
-        buffer = io.BytesIO()
-        wb.save(buffer)
-        buffer.seek(0)
-
-        # Convert to base64
-        base64_string = base64.b64encode(buffer.getvalue()).decode()
-        from edsl.scenarios.FileStore import FileStore
-
-        return FileStore(
-            path=filename,
-            mime_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            binary=True,
-            suffix="xlsx",
-            base64_string=base64_string,
-        )
+        return exporter.export()
 
     def _db(self, remove_prefix: bool = True):
         """Create a SQLite database in memory and return the connection.
@@ -396,6 +319,26 @@ class DatasetExportMixin:
         # df_sorted = df.sort_index(axis=1)  # Sort columns alphabetically
         return df
 
+    def to_polars(
+        self, remove_prefix: bool = False, lists_as_strings=False
+    ) -> "pl.DataFrame":
+        """Convert the results to a Polars DataFrame.
+
+        :param remove_prefix: Whether to remove the prefix from the column names.
+        """
+        return self._to_polars_strings(remove_prefix)
+
+    def _to_polars_strings(self, remove_prefix: bool = False) -> "pl.DataFrame":
+        """Convert the results to a Polars DataFrame.
+
+        :param remove_prefix: Whether to remove the prefix from the column names.
+        """
+        import polars as pl
+
+        csv_string = self.to_csv(remove_prefix=remove_prefix).text
+        df = pl.read_csv(io.StringIO(csv_string))
+        return df
+
     def to_scenario_list(self, remove_prefix: bool = True) -> list[dict]:
         """Convert the results to a list of dictionaries, one per scenario.
 
@@ -406,7 +349,8 @@ class DatasetExportMixin:
         >>> r.select('how_feeling').to_scenario_list()
         ScenarioList([Scenario({'how_feeling': 'OK'}), Scenario({'how_feeling': 'Great'}), Scenario({'how_feeling': 'Terrible'}), Scenario({'how_feeling': 'OK'})])
         """
-        from edsl import ScenarioList, Scenario
+        from edsl.scenarios.ScenarioList import ScenarioList
+        from edsl.scenarios.Scenario import Scenario
 
         list_of_dicts = self.to_dicts(remove_prefix=remove_prefix)
         scenarios = []
@@ -424,7 +368,8 @@ class DatasetExportMixin:
         >>> r.select('how_feeling').to_agent_list()
         AgentList([Agent(traits = {'how_feeling': 'OK'}), Agent(traits = {'how_feeling': 'Great'}), Agent(traits = {'how_feeling': 'Terrible'}), Agent(traits = {'how_feeling': 'OK'})])
         """
-        from edsl import AgentList, Agent
+        from edsl.agents import Agent
+        from edsl.agents.AgentList import AgentList
 
         list_of_dicts = self.to_dicts(remove_prefix=remove_prefix)
         agents = []
@@ -432,6 +377,11 @@ class DatasetExportMixin:
             if "name" in d:
                 d["agent_name"] = d.pop("name")
                 agents.append(Agent(d, name=d["agent_name"]))
+            if "agent_parameters" in d:
+                agent_parameters = d.pop("agent_parameters")
+                agent_name = agent_parameters.get("name", None)
+                instruction = agent_parameters.get("instruction", None)
+                agents.append(Agent(d, name=agent_name, instruction=instruction))
             else:
                 agents.append(Agent(d))
         return AgentList(agents)
@@ -606,8 +556,6 @@ class DatasetExportMixin:
         if top_n is not None:
             sorted_tally = dict(list(sorted_tally.items())[:top_n])
 
-        import warnings
-        import textwrap
         from edsl.results.Dataset import Dataset
 
         if output == "dict":

@@ -1,15 +1,16 @@
 from typing import Generator, TYPE_CHECKING
 from itertools import product
 
-from edsl.jobs.interviews.Interview import Interview
+if TYPE_CHECKING:
+    from edsl.jobs.interviews.Interview import Interview
 
 
 class InterviewsConstructor:
-
-    def __init__(self, jobs):
+    def __init__(self, jobs: "Jobs", cache: "Cache"):
         self.jobs = jobs
+        self.cache = cache
 
-    def create_interviews(self) -> Generator[Interview, None, None]:
+    def create_interviews(self) -> Generator["Interview", None, None]:
         """
         Generate interviews.
 
@@ -17,8 +18,9 @@ class InterviewsConstructor:
         This is useful because a user can create a job without setting the agents, models, or scenarios, and the job will still run,
         with us filling in defaults.
 
-
         """
+        from edsl.jobs.interviews.Interview import Interview
+
         agent_index = {
             hash(agent): index for index, agent in enumerate(self.jobs.agents)
         }
@@ -33,12 +35,13 @@ class InterviewsConstructor:
             self.jobs.agents, self.jobs.scenarios, self.jobs.models
         ):
             yield Interview(
-                survey=self.jobs.survey,
+                survey=self.jobs.survey.draw(),
                 agent=agent,
                 scenario=scenario,
                 model=model,
-                skip_retry=self.jobs.skip_retry,
-                raise_validation_errors=self.jobs.raise_validation_errors,
+                cache=self.cache,
+                skip_retry=self.jobs.run_config.parameters.skip_retry,
+                raise_validation_errors=self.jobs.run_config.parameters.raise_validation_errors,
                 indices={
                     "agent": agent_index[hash(agent)],
                     "model": model_index[hash(model)],

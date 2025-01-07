@@ -1,20 +1,17 @@
 from typing import List, Optional
 from io import BytesIO
-import webbrowser
-import os
 import base64
-from importlib import resources
 from edsl.jobs.tasks.task_status_enum import TaskStatus
-
 from edsl.Base import RepresentationMixin
 
 
 class TaskHistory(RepresentationMixin):
     def __init__(
         self,
-        interviews: List["Interview"],
+        interviews: List["Interview"] = None,
         include_traceback: bool = False,
         max_interviews: int = 10,
+        interviews_with_exceptions_only: bool = False,
     ):
         """
         The structure of a TaskHistory exception
@@ -24,12 +21,32 @@ class TaskHistory(RepresentationMixin):
         >>> _ = TaskHistory.example()
         ...
         """
+        self.interviews_with_exceptions_only = interviews_with_exceptions_only
+        self._interviews = {}
+        self.total_interviews = []
+        if interviews is not None:
+            for interview in interviews:
+                self.add_interview(interview)
 
-        self.total_interviews = interviews
+        self.include_traceback = include_traceback
+        self._interviews = {
+            index: interview for index, interview in enumerate(self.total_interviews)
+        }
+        self.max_interviews = max_interviews
+
+        # self.total_interviews = interviews
         self.include_traceback = include_traceback
 
-        self._interviews = {index: i for index, i in enumerate(self.total_interviews)}
+        # self._interviews = {index: i for index, i in enumerate(self.total_interviews)}
         self.max_interviews = max_interviews
+
+    def add_interview(self, interview: "Interview"):
+        """Add a single interview to the history"""
+        if self.interviews_with_exceptions_only and interview.exceptions == {}:
+            return
+
+        self.total_interviews.append(interview)
+        self._interviews[len(self._interviews)] = interview
 
     @classmethod
     def example(cls):
@@ -234,11 +251,15 @@ class TaskHistory(RepresentationMixin):
             plt.show()
 
     def css(self):
+        from importlib import resources
+
         env = resources.files("edsl").joinpath("templates/error_reporting")
         css = env.joinpath("report.css").read_text()
         return css
 
     def javascript(self):
+        from importlib import resources
+
         env = resources.files("edsl").joinpath("templates/error_reporting")
         js = env.joinpath("report.js").read_text()
         return js
@@ -275,7 +296,7 @@ class TaskHistory(RepresentationMixin):
         exceptions_by_question_name = {}
         for interview in self.total_interviews:
             for question_name, exceptions in interview.exceptions.items():
-                question_type = interview.survey.get_question(
+                question_type = interview.survey._get_question_by_name(
                     question_name
                 ).question_type
                 if (question_name, question_type) not in exceptions_by_question_name:
@@ -406,6 +427,8 @@ class TaskHistory(RepresentationMixin):
             print(f"Exception report saved to {filename}")
 
         if open_in_browser:
+            import webbrowser
+
             webbrowser.open(f"file://{os.path.abspath(filename)}")
 
         if return_link:

@@ -2,6 +2,7 @@
 
 Agents
 ======
+
 `Agent` objects are used to simulate survey responses for target audiences. 
 They are created with specified traits, such as personas and relevant attributes for a survey, that are used together with language models to generate answers to questions. 
 
@@ -109,30 +110,14 @@ We can create a simple `AgentList` from a list using the `from_list()` method, w
 
 Output:
 
-.. code-block:: text 
+.. list-table::
+   :header-rows: 1
 
-    [
-        {
-            "traits": {
-                "age": 10
-            }
-        },
-        {
-            "traits": {
-                "age": 20
-            }
-        },
-        {
-            "traits": {
-                "age": 30
-            }
-        },
-        {
-            "traits": {
-                "age": 40
-            }
-        }
-    ]
+   * - age
+   * - 10
+   * - 20
+   * - 30
+   * - 40
 
 
 From a dictionary
@@ -161,45 +146,21 @@ It takes a dictionary with a key `agent_list` and a list of dictionaries, each o
 
 Output:
 
-.. code-block:: text
+.. list-table::
+   :header-rows: 1
 
-    [
-        {
-            "name": "agent1",
-            "traits": {
-                "age": 10,
-                "location": "New York"
-            }
-        },
-        {
-            "name": "agent2",
-            "traits": {
-                "age": 20,
-                "location": "California"
-            }
-        },
-        {
-            "name": "agent3",
-            "traits": {
-                "age": 30,
-                "location": "Texas"
-            }
-        },
-        {
-            "name": "agent4",
-            "traits": {
-                "age": 40,
-                "location": "Florida"
-            }
-        },
-        {
-            "name": "agent5",
-            "traits": {
-                "age": 50,
-                "location": "Washington"
-            }
-        }
-    ]
+   * - location
+     - age
+   * - New York
+     - 10
+   * - California
+     - 20
+   * - Texas
+     - 30
+   * - Florida
+     - 40
+   * - Washington
+     - 50
 
 
 From a CSV file
@@ -232,32 +193,17 @@ The CSV file must have a header row of Pythonic keys for the `traits`, and can o
 
 Output:
 
-.. code-block:: text
+.. list-table::
+   :header-rows: 1
 
-    [
-        {
-            "name": "Alice",
-            "traits": {
-                "age": 25,
-                "city": "New York"
-            }
-        },
-        {
-            "name": "Bob",
-            "traits": {
-                "age": 30,
-                "city": "San Francisco"
-            }
-        },
-        {
-            "name": "Charlie",
-            "traits": {
-                "age": 35,
-                "city": "Chicago"
-            }
-        }
-    ]
-
+   * - city
+     - age
+   * - New York
+     - 25
+   * - San Francisco
+     - 30
+   * - Chicago
+     - 35
 
 
 Dynamic traits function
@@ -266,7 +212,9 @@ Dynamic traits function
 Agents can also be created with a `dynamic_traits_function` parameter. 
 This function can be used to generate traits dynamically based on the question being asked or the scenario in which the question is asked.
 
-For example:
+*Note:* This method is only available with local inference. It does not work with remote inference.
+
+Example:
 
 .. code-block:: python
 
@@ -351,8 +299,10 @@ For example:
 
 .. code-block:: python
 
-    a = Agent(traits = {'age': 22, 'hair': 'brown', 'gender': 'female'}, 
-        traits_presentation_template = "I am a {{ age }} year-old {{ gender }} with {{ hair }} hair.")
+    a = Agent(
+        traits = {'age': 22, 'hair': 'brown', 'gender': 'female'}, 
+        traits_presentation_template = "I am a {{ age }} year-old {{ gender }} with {{ hair }} hair."
+        )
 
     a.agent_persona.render(primary_replacement = a.traits)
 
@@ -373,9 +323,11 @@ This can be handled by using a dictionary with string keys and values, for examp
 
     codebook = {'age': 'The age of the agent'}
 
-    a = Agent(traits = {'age': 22}, 
+    a = Agent(
+        traits = {'age': 22}, 
         codebook = codebook, 
-        traits_presentation_template = "{{ codebook['age'] }} is {{ age }}.")
+        traits_presentation_template = "{{ codebook['age'] }} is {{ age }}."
+        )
 
     a.agent_persona.render(primary_replacement = a.traits)
 
@@ -394,21 +346,21 @@ The following code will include the agent's age as a column of a table with any 
 
 .. code-block:: python
 
-    results.select("agent.age", "agent.agent_name", "answer.*").print()
+    results.select("agent.age", "agent.agent_name", "answer.*")
 
 
 Note that the prefix "agent" can also be dropped. The following code is equivalent:
 
 .. code-block:: python
 
-    results.select("age", "agent_name", "answer.*").print()
+    results.select("age", "agent_name", "answer.*")
 
 
 We can filter the results by an agent's traits:
 
 .. code-block:: python
 
-    results.filter("age == 22").print()
+    results.filter("age == 22")
 
 
 We can also call the `filter()` method on an agent list to filter agents by their traits:
@@ -438,18 +390,16 @@ For example:
     )
 
     job = q.by(a)
-    job.prompts().select("user_prompt").print(format="rich")
+    job.prompts().select("user_prompt")
 
 
 Output:
 
-.. code-block:: text
+.. list-table::
+   :header-rows: 1
 
-    ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
-    ┃ user_prompt                   ┃
-    ┡━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
-    │ What is your last name, John? │
-    └───────────────────────────────┘
+   * - user_prompt
+   * - What is your last name, John?
 
 
 Learn more about user and system prompts in the :ref:`prompts` section.
@@ -534,24 +484,28 @@ We can select and inspect components of the results, such as the agent's traits 
 
 .. code-block:: python
 
-    results.select("persona", "year", "school", "major", "state", "answer.*").print()
+    results.select("persona", "year", "school", "major", "state", "answer.*")
 
 
 Output:
 
-.. code-block:: text 
+.. list-table::
+   :header-rows: 1
 
-    ┏━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━┓
-    ┃ agent             ┃ agent     ┃ agent             ┃ agent   ┃ agent    ┃ answer            ┃ answer             ┃
-    ┃ .persona          ┃ .year     ┃ .school           ┃ .major  ┃ .state   ┃ .favorite_courses ┃ .attend_grad_scho… ┃
-    ┡━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━╇━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━┩
-    │ You are a         │ sophomore │ community college │ biology │ New York │ ['General Biology │ Undecided          │
-    │ sophomore at a    │           │                   │         │          │ II', 'Organic     │                    │
-    │ community college │           │                   │         │          │ Chemistry I',     │                    │
-    │ in upstate New    │           │                   │         │          │ 'Environmental    │                    │
-    │ York.             │           │                   │         │          │ Science']         │                    │
-    └───────────────────┴───────────┴───────────────────┴─────────┴──────────┴───────────────────┴────────────────────┘
-
+   * - agent.persona
+     - agent.year
+     - agent.school
+     - agent.major
+     - agent.state
+     - answer.favorite_courses
+     - answer.attend_grad_school
+   * - You are a sophomore at a community college in upstate New York.
+     - sophomore
+     - community college
+     - biology
+     - New York
+     - ['General Biology I', 'Organic Chemistry', 'Environmental Science']
+     - Undecided
 
 
 If multiple agents will be used with a survey, they are passed as a list in the same `by` call:
@@ -568,24 +522,30 @@ If multiple agents will be used with a survey, they are passed as a list in the 
 
     results = survey.by(agents).run() # using the same survey as above
 
-    results.select("major", "year", "answer.*").print()
+    results.select("major", "year", "answer.*")
 
 
 Output:
 
-.. code-block:: text 
+.. list-table::
+   :header-rows: 1
 
-    ┏━━━━━━━━━━━━━┳━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━┓
-    ┃ agent       ┃ agent     ┃ answer                                                          ┃ answer              ┃
-    ┃ .major      ┃ .year     ┃ .favorite_courses                                               ┃ .attend_grad_school ┃
-    ┡━━━━━━━━━━━━━╇━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━┩
-    │ biology     │ sophomore │ ['Genetics', 'Ecology', 'Cell Biology']                         │ Undecided           │
-    ├─────────────┼───────────┼─────────────────────────────────────────────────────────────────┼─────────────────────┤
-    │ mathematics │ senior    │ ['Real Analysis', 'Abstract Algebra', 'Topology']               │ Undecided           │
-    ├─────────────┼───────────┼─────────────────────────────────────────────────────────────────┼─────────────────────┤
-    │ history     │ junior    │ ['History of Ancient Civilizations', 'Medieval European         │ Undecided           │
-    │             │           │ History', 'History of Modern Political Thought']                │                     │
-    └─────────────┴───────────┴─────────────────────────────────────────────────────────────────┴─────────────────────┘
+   * - agent.major
+     - agent.year
+     - answer.favorite_courses
+     - answer.attend_grad_school
+   * - biology
+     - sophomore
+     - ['Genetics', 'Ecology', 'Cell Biology']
+     - Undecided
+   * - history
+     - junior
+     - ['Medieval Europe', 'The American Civil War', 'Ancient Civilizations']
+     - Undecided
+   * - mathematics
+     - senior
+     - ['Abstract Algebra', 'Real Analysis', 'Topology']
+     - Undecided
 
 
 If scenarios and/or models are also specified for a survey, each component type is added in a separate `by` call that can be chained in any order with the `run` method appended last:
@@ -642,14 +602,15 @@ We can also add a new trait to an agent:
 
 Output:
 
-.. code-block:: text
+.. list-table::
+    :header-rows: 1
 
-    {
-        "traits": {
-            "age": 22,
-            "location": "California"
-        }
-    }
+    * - key
+      - value
+    * - traits:age
+      - 22
+    * - traits:location
+      - California
 
 
 Removing a trait
@@ -669,13 +630,13 @@ We can remove a trait from an agent:
 
 Output:
 
-.. code-block:: text
+.. list-table::
+    :header-rows: 1
 
-    {
-        "traits": {
-            "location": "California"
-        }
-    }
+    * - key
+      - value
+    * - traits:location
+      - California
 
 
 Using survey responses as new agent traits
@@ -690,7 +651,7 @@ After running a survey, we can use the responses to create new traits for an age
     a = Agent(traits = {"age": 22, "location": "California"})
 
     q = QuestionMultipleChoice(
-        question_name = "surfing"
+        question_name = "surfing",
         question_text = "How often do you go surfing?",
         question_options = ["Never", "Sometimes", "Often"]
     )
@@ -698,20 +659,21 @@ After running a survey, we can use the responses to create new traits for an age
     survey = Survey([q])
     results = survey.by(a).run()
 
-    a = results.select("age", "location", "surfing").to_agent_list()[0] # create new agent with traits from results
+    a = results.select("age", "location", "surfing").to_agent_list() # create new agent with traits from results
+    a
 
 
 Output: 
 
-.. code-block:: text
+.. list-table::
+  :header-rows: 1
 
-    {
-        "traits": {
-            "age": 22,
-            "location": "California",
-            "surfing": "Sometimes"
-        }
-    }
+  * - location
+    - surfing
+    - age
+  * - California
+    - Sometimes
+    - 22
 
 
 Note that in the example above we simply replaced the original agent by selecting the first agent from the agent list that we created.
@@ -739,35 +701,26 @@ Here we use the same method to update multiple agents at once:
     results = survey.by(agents).run()
 
     agents = results.select("age", "location", "surfing").to_agent_list() 
+    agents
 
 
 Output:
 
-.. code-block:: text
+.. list-table::
+  :header-rows: 1
 
-    [
-        {
-            "traits": {
-                "age": 22,
-                "location": "California",
-                "surfing": "Sometimes"
-            }
-        },
-        {
-            "traits": {
-                "age": 40,
-                "location": "Texas",
-                "surfing": "Never"
-            }
-        },
-        {
-            "traits": {
-                "age": 30,
-                "location": "New York",
-                "surfing": "Never"
-            }
-        }
-    ]
+  * - location
+    - surfing
+    - age
+  * - California
+    - Sometimes
+    - 22
+  * - New York
+    - Never
+    - 30
+  * - Texas
+    - Never
+    - 40
 
 
 Agent class
@@ -778,6 +731,7 @@ Agent class
    :show-inheritance:
    :special-members: __init__
    :exclude-members: codebook, data, main
+   
    
 AgentList class
 ---------------

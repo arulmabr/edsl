@@ -1,18 +1,22 @@
-from typing import Optional, List
+from typing import Optional, List, TYPE_CHECKING
 from collections import UserList
-from edsl import Model
 
-from edsl.language_models import LanguageModel
 from edsl.Base import Base
-from edsl.utilities.decorators import add_edsl_version, remove_edsl_version
-from edsl.utilities.utilities import is_valid_variable_name
-from edsl.utilities.utilities import dict_hash
+from edsl.language_models.model import Model
+
+#
+from edsl.utilities.remove_edsl_version import remove_edsl_version
+from edsl.utilities.is_valid_variable_name import is_valid_variable_name
+
+if TYPE_CHECKING:
+    from edsl.inference_services.data_structures import AvailableModels
+    from edsl.language_models import LanguageModel
 
 
 class ModelList(Base, UserList):
     __documentation__ = """https://docs.expectedparrot.com/en/latest/language_models.html#module-edsl.language_models.ModelList"""
 
-    def __init__(self, data: Optional[list] = None):
+    def __init__(self, data: Optional["LanguageModel"] = None):
         """Initialize the ScenarioList class.
 
         >>> from edsl import Model
@@ -33,9 +37,6 @@ class ModelList(Base, UserList):
         """
         return set([model.model for model in self])
 
-    def rich_print(self):
-        pass
-
     def __repr__(self):
         return f"ModelList({super().__repr__()})"
 
@@ -54,7 +55,8 @@ class ModelList(Base, UserList):
         return dict_hash(self.to_dict(sort=True, add_edsl_version=False))
 
     def to_scenario_list(self):
-        from edsl import ScenarioList, Scenario
+        from edsl.scenarios.ScenarioList import ScenarioList
+        from edsl.scenarios.Scenario import Scenario
 
         sl = ScenarioList()
         for model in self:
@@ -74,16 +76,11 @@ class ModelList(Base, UserList):
     ):
         """
         >>> ModelList.example().table('model')
-        ┏━━━━━━━━┓
-        ┃ model  ┃
-        ┡━━━━━━━━┩
-        │ gpt-4o │
-        ├────────┤
-        │ gpt-4o │
-        ├────────┤
-        │ gpt-4o │
-        └────────┘
-        ...
+        model
+        -------
+        gpt-4o
+        gpt-4o
+        gpt-4o
         """
         return (
             self.to_scenario_list()
@@ -91,7 +88,7 @@ class ModelList(Base, UserList):
             .table(*fields, tablefmt=tablefmt, pretty_labels=pretty_labels)
         )
 
-    def to_list(self):
+    def to_list(self) -> list:
         return self.to_scenario_list().to_list()
 
     def to_dict(self, sort=False, add_edsl_version=True):
@@ -125,6 +122,16 @@ class ModelList(Base, UserList):
         return ModelList([Model(model_name, **kwargs) for model_name in args])
 
     @classmethod
+    def from_available_models(self, available_models_list: "AvailableModels"):
+        """Create a ModelList from an AvailableModels object"""
+        return ModelList(
+            [
+                Model(model.model_name, service_name=model.service_name)
+                for model in available_models_list
+            ]
+        )
+
+    @classmethod
     @remove_edsl_version
     def from_dict(cls, data):
         """
@@ -133,6 +140,8 @@ class ModelList(Base, UserList):
         >>> newm = ModelList.from_dict(ModelList.example().to_dict())
         >>> assert ModelList.example() == newm
         """
+        from edsl.language_models.LanguageModel import LanguageModel
+
         return cls(data=[LanguageModel.from_dict(model) for model in data["models"]])
 
     def code(self):

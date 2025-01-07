@@ -1,11 +1,11 @@
-import os
+# import os
 from typing import Any, Dict, List, Optional
 import google
 import google.generativeai as genai
 from google.generativeai.types import GenerationConfig
 from google.api_core.exceptions import InvalidArgument
 
-from edsl.exceptions import MissingAPIKeyError
+# from edsl.exceptions.general import MissingAPIKeyError
 from edsl.language_models.LanguageModel import LanguageModel
 from edsl.inference_services.InferenceServiceABC import InferenceServiceABC
 from edsl.coop import Coop
@@ -40,12 +40,16 @@ class GoogleService(InferenceServiceABC):
     model_exclude_list = []
 
     @classmethod
-    def available(cls) -> List[str]:
+    def get_model_list(cls):
         model_list = []
         for m in genai.list_models():
             if "generateContent" in m.supported_generation_methods:
                 model_list.append(m.name.split("/")[-1])
         return model_list
+
+    @classmethod
+    def available(cls) -> List[str]:
+        return cls.get_model_list()
 
     @classmethod
     def create_model(

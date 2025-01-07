@@ -51,7 +51,7 @@ class QuestionInstructionPromptBuilder:
             Dict: Enriched prompt data
         """
         if "question_options" in prompt_data["data"]:
-            from edsl.agents.QuestionOptionProcessor import QuestionOptionProcessor
+            from edsl.agents.question_option_processor import QuestionOptionProcessor
 
             question_options = QuestionOptionProcessor(
                 self.prompt_constructor
@@ -114,7 +114,7 @@ class QuestionInstructionPromptBuilder:
         Returns:
             Prompt: Final prompt with survey instructions
         """
-        relevant_instructions = self.survey.relevant_instructions(
+        relevant_instructions = self.survey._relevant_instructions(
             self.question.question_name
         )
 

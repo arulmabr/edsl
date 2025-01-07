@@ -2,29 +2,85 @@
 
 from __future__ import annotations
 import re
+import random
 
-from typing import Any, Generator, Optional, Union, List, Literal, Callable
+from typing import (
+    Any,
+    Generator,
+    Optional,
+    Union,
+    List,
+    Literal,
+    Callable,
+    TYPE_CHECKING,
+)
 from uuid import uuid4
 from edsl.Base import Base
-from edsl.exceptions import SurveyCreationError, SurveyHasNoRulesError
+from edsl.exceptions.surveys import SurveyCreationError, SurveyHasNoRulesError
 from edsl.exceptions.surveys import SurveyError
+from collections import UserDict
 
-from edsl.questions.QuestionBase import QuestionBase
-from edsl.utilities.decorators import remove_edsl_version
-from edsl.agents.Agent import Agent
+
+class PseudoIndices(UserDict):
+    @property
+    def max_pseudo_index(self) -> float:
+        """Return the maximum pseudo index in the survey.
+        >>> Survey.example()._pseudo_indices.max_pseudo_index
+        2
+        """
+        if len(self) == 0:
+            return -1
+        return max(self.values())
+
+    @property
+    def last_item_was_instruction(self) -> bool:
+        """Return whether the last item added to the survey was an instruction.
+
+        This is used to determine the pseudo-index of the next item added to the survey.
+
+        Example:
+
+        >>> s = Survey.example()
+        >>> s._pseudo_indices.last_item_was_instruction
+        False
+        >>> from edsl.surveys.instructions.Instruction import Instruction
+        >>> s = s.add_instruction(Instruction(text="Pay attention to the following questions.", name="intro"))
+        >>> s._pseudo_indices.last_item_was_instruction
+        True
+        """
+        return isinstance(self.max_pseudo_index, float)
+
+
+if TYPE_CHECKING:
+    from edsl.questions.QuestionBase import QuestionBase
+    from edsl.agents.Agent import Agent
+    from edsl.surveys.DAG import DAG
+    from edsl.language_models.LanguageModel import LanguageModel
+    from edsl.scenarios.Scenario import Scenario
+    from edsl.data.Cache import Cache
+
+    # This is a hack to get around the fact that TypeAlias is not available in typing until Python 3.10
+    try:
+        from typing import TypeAlias
+    except ImportError:
+        from typing import _GenericAlias as TypeAlias
+
+    QuestionType: TypeAlias = Union[QuestionBase, Instruction, ChangeInstruction]
+    QuestionGroupType: TypeAlias = dict[str, tuple[int, int]]
+
+
+from edsl.utilities.remove_edsl_version import remove_edsl_version
 
 from edsl.surveys.instructions.InstructionCollection import InstructionCollection
 from edsl.surveys.instructions.Instruction import Instruction
 from edsl.surveys.instructions.ChangeInstruction import ChangeInstruction
-from edsl.surveys.ConstructDAG import ConstructDAG
-from edsl.surveys.base import RulePriority, EndOfSurvey
-from edsl.surveys.DAG import DAG
+
+from edsl.surveys.base import EndOfSurvey
 from edsl.surveys.descriptors import QuestionsDescriptor
 from edsl.surveys.MemoryPlan import MemoryPlan
-from edsl.surveys.Rule import Rule
 from edsl.surveys.RuleCollection import RuleCollection
 from edsl.surveys.SurveyExportMixin import SurveyExportMixin
-from edsl.surveys.SurveyFlowVisualizationMixin import SurveyFlowVisualizationMixin
+from edsl.surveys.SurveyFlowVisualization import SurveyFlowVisualization
 from edsl.surveys.InstructionHandler import InstructionHandler
 from edsl.surveys.EditSurvey import EditSurvey
 from edsl.surveys.Simulator import Simulator
@@ -32,7 +88,7 @@ from edsl.surveys.MemoryManagement import MemoryManagement
 from edsl.surveys.RuleManager import RuleManager
 
 
-class Survey(SurveyExportMixin, SurveyFlowVisualizationMixin, Base):
+class Survey(SurveyExportMixin, Base):
     """A collection of questions that supports skip logic."""
 
     __documentation__ = """https://docs.expectedparrot.com/en/latest/surveys.html"""
@@ -55,13 +111,12 @@ class Survey(SurveyExportMixin, SurveyFlowVisualizationMixin, Base):
 
     def __init__(
         self,
-        questions: Optional[
-            list[Union[QuestionBase, Instruction, ChangeInstruction]]
-        ] = None,
-        memory_plan: Optional[MemoryPlan] = None,
-        rule_collection: Optional[RuleCollection] = None,
-        question_groups: Optional[dict[str, tuple[int, int]]] = None,
+        questions: Optional[List["QuestionType"]] = None,
+        memory_plan: Optional["MemoryPlan"] = None,
+        rule_collection: Optional["RuleCollection"] = None,
+        question_groups: Optional["QuestionGroupType"] = None,
         name: Optional[str] = None,
+        questions_to_randomize: Optional[List[str]] = None,
     ):
         """Create a new survey.
 
@@ -83,11 +138,7 @@ class Survey(SurveyExportMixin, SurveyFlowVisualizationMixin, Base):
 
         self.raw_passed_questions = questions
 
-        handler = InstructionHandler(self)
-        components = handler.separate_questions_and_instructions(questions or [])
-        true_questions = components.true_questions
-        instruction_names_to_instructions = components.instruction_names_to_instructions
-        self.pseudo_indices = components.pseudo_indices
+        true_questions = self._process_raw_questions(self.raw_passed_questions)
 
         self.rule_collection = RuleCollection(
             num_questions=len(true_questions) if true_questions else None
@@ -95,8 +146,9 @@ class Survey(SurveyExportMixin, SurveyFlowVisualizationMixin, Base):
         # the RuleCollection needs to be present while we add the questions; we might override this later
         # if a rule_collection is provided. This allows us to serialize the survey with the rule_collection.
 
-        self.questions = true_questions  # this is where the constructor is called.
-        self.instruction_names_to_instructions = instruction_names_to_instructions
+        # this is where the Questions constructor is called.
+        self.questions = true_questions
+        # self.instruction_names_to_instructions = instruction_names_to_instructions
 
         self.memory_plan = memory_plan or MemoryPlan(self)
         if question_groups is not None:
@@ -104,7 +156,7 @@ class Survey(SurveyExportMixin, SurveyFlowVisualizationMixin, Base):
         else:
             self.question_groups = {}
 
-        # if a rule collection is provided, use it instead
+        # if a rule collection is provided, use it instead of the constructed one
         if rule_collection is not None:
             self.rule_collection = rule_collection
 
@@ -113,21 +165,58 @@ class Survey(SurveyExportMixin, SurveyFlowVisualizationMixin, Base):
 
             warnings.warn("name parameter to a survey is deprecated.")
 
+        if questions_to_randomize is not None:
+            self.questions_to_randomize = questions_to_randomize
+        else:
+            self.questions_to_randomize = []
+
+        self._seed = None
+
+    def draw(self) -> "Survey":
+        """Return a new survey with a randomly selected permutation of the options."""
+        if self._seed is None:  # only set once
+            self._seed = hash(self)
+            random.seed(self._seed)
+
+        if len(self.questions_to_randomize) == 0:
+            return self
+
+        new_questions = []
+        for question in self.questions:
+            if question.question_name in self.questions_to_randomize:
+                new_questions.append(question.draw())
+            else:
+                new_questions.append(question.duplicate())
+
+        d = self.to_dict()
+        d["questions"] = [q.to_dict() for q in new_questions]
+        return Survey.from_dict(d)
+
+    def _process_raw_questions(self, questions: Optional[List["QuestionType"]]) -> list:
+        """Process the raw questions passed to the survey."""
+        handler = InstructionHandler(self)
+        components = handler.separate_questions_and_instructions(questions or [])
+        self._instruction_names_to_instructions = (
+            components.instruction_names_to_instructions
+        )
+        self._pseudo_indices = PseudoIndices(components.pseudo_indices)
+        return components.true_questions
+
     # region: Survey instruction handling
     @property
-    def relevant_instructions_dict(self) -> InstructionCollection:
+    def _relevant_instructions_dict(self) -> InstructionCollection:
         """Return a dictionary with keys as question names and values as instructions that are relevant to the question.
 
         >>> s = Survey.example(include_instructions=True)
-        >>> s.relevant_instructions_dict
+        >>> s._relevant_instructions_dict
         {'q0': [Instruction(name="attention", text="Please pay attention!")], 'q1': [Instruction(name="attention", text="Please pay attention!")], 'q2': [Instruction(name="attention", text="Please pay attention!")]}
 
         """
         return InstructionCollection(
-            self.instruction_names_to_instructions, self.questions
+            self._instruction_names_to_instructions, self.questions
         )
 
-    def relevant_instructions(self, question) -> dict:
+    def _relevant_instructions(self, question: QuestionBase) -> dict:
         """This should be a dictionry with keys as question names and values as instructions that are relevant to the question.
 
         :param question: The question to get the relevant instructions for.
@@ -136,35 +225,12 @@ class Survey(SurveyExportMixin, SurveyFlowVisualizationMixin, Base):
 
         """
         return InstructionCollection(
-            self.instruction_names_to_instructions, self.questions
+            self._instruction_names_to_instructions, self.questions
         )[question]
 
-    @property
-    def max_pseudo_index(self) -> float:
-        """Return the maximum pseudo index in the survey.
-        >>> Survey.example().max_pseudo_index
-        2
-        """
-        if len(self.pseudo_indices) == 0:
-            return -1
-        return max(self.pseudo_indices.values())
-
-    @property
-    def last_item_was_instruction(self) -> bool:
-        """Return whether the last item added to the survey was an instruction.
-        This is used to determine the pseudo-index of the next item added to the survey.
-
-        Example:
-
-        >>> s = Survey.example()
-        >>> s.last_item_was_instruction
-        False
-        >>> from edsl.surveys.instructions.Instruction import Instruction
-        >>> s = s.add_instruction(Instruction(text="Pay attention to the following questions.", name="intro"))
-        >>> s.last_item_was_instruction
-        True
-        """
-        return isinstance(self.max_pseudo_index, float)
+    def show_flow(self, filename: Optional[str] = None) -> None:
+        """Show the flow of the survey."""
+        SurveyFlowVisualization(self).show_flow(filename=filename)
 
     def add_instruction(
         self, instruction: Union["Instruction", "ChangeInstruction"]
@@ -177,9 +243,9 @@ class Survey(SurveyExportMixin, SurveyFlowVisualizationMixin, Base):
         >>> from edsl import Instruction
         >>> i = Instruction(text="Pay attention to the following questions.", name="intro")
         >>> s = Survey().add_instruction(i)
-        >>> s.instruction_names_to_instructions
+        >>> s._instruction_names_to_instructions
         {'intro': Instruction(name="intro", text="Pay attention to the following questions.")}
-        >>> s.pseudo_indices
+        >>> s._pseudo_indices
         {'intro': -0.5}
         """
         return EditSurvey(self).add_instruction(instruction)
@@ -227,20 +293,19 @@ class Survey(SurveyExportMixin, SurveyFlowVisualizationMixin, Base):
                 )
             return self.question_name_to_index[question_name]
 
-    def get_question(self, question_name: str) -> QuestionBase:
+    def _get_question_by_name(self, question_name: str) -> QuestionBase:
         """
         Return the question object given the question name.
 
         :param question_name: The name of the question to get.
 
         >>> s = Survey.example()
-        >>> s.get_question("q0")
+        >>> s._get_question_by_name("q0")
         Question('multiple_choice', question_name = \"""q0\""", question_text = \"""Do you like school?\""", question_options = ['yes', 'no'])
         """
         if question_name not in self.question_name_to_index:
             raise SurveyError(f"Question name {question_name} not found in survey.")
-        index = self.question_name_to_index[question_name]
-        return self._questions[index]
+        return self._questions[self.question_name_to_index[question_name]]
 
     def question_names_to_questions(self) -> dict:
         """Return a dictionary mapping question names to question attributes."""
@@ -280,7 +345,9 @@ class Survey(SurveyExportMixin, SurveyFlowVisualizationMixin, Base):
         >>> s.to_dict(add_edsl_version = False).keys()
         dict_keys(['questions', 'memory_plan', 'rule_collection', 'question_groups'])
         """
-        return {
+        from edsl import __version__
+
+        d = {
             "questions": [
                 q.to_dict(add_edsl_version=add_edsl_version)
                 for q in self._recombined_questions_and_instructions()
@@ -291,6 +358,13 @@ class Survey(SurveyExportMixin, SurveyFlowVisualizationMixin, Base):
             ),
             "question_groups": self.question_groups,
         }
+        if self.questions_to_randomize != []:
+            d["questions_to_randomize"] = self.questions_to_randomize
+
+        if add_edsl_version:
+            d["edsl_version"] = __version__
+            d["edsl_class_name"] = "Survey"
+        return d
 
     @classmethod
     @remove_edsl_version
@@ -313,6 +387,8 @@ class Survey(SurveyExportMixin, SurveyFlowVisualizationMixin, Base):
         """
 
         def get_class(pass_dict):
+            from edsl.questions.QuestionBase import QuestionBase
+
             if (class_name := pass_dict.get("edsl_class_name")) == "QuestionBase":
                 return QuestionBase
             elif class_name == "Instruction":
@@ -332,11 +408,16 @@ class Survey(SurveyExportMixin, SurveyFlowVisualizationMixin, Base):
             get_class(q_dict).from_dict(q_dict) for q_dict in data["questions"]
         ]
         memory_plan = MemoryPlan.from_dict(data["memory_plan"])
+        if "questions_to_randomize" in data:
+            questions_to_randomize = data["questions_to_randomize"]
+        else:
+            questions_to_randomize = None
         survey = cls(
             questions=questions,
             memory_plan=memory_plan,
             rule_collection=RuleCollection.from_dict(data["rule_collection"]),
             question_groups=data["question_groups"],
+            questions_to_randomize=questions_to_randomize,
         )
         return survey
 
@@ -484,10 +565,10 @@ class Survey(SurveyExportMixin, SurveyFlowVisualizationMixin, Base):
     ) -> list[Union[QuestionBase, "Instruction"]]:
         """Return a list of questions and instructions sorted by pseudo index."""
         questions_and_instructions = self._questions + list(
-            self.instruction_names_to_instructions.values()
+            self._instruction_names_to_instructions.values()
         )
         return sorted(
-            questions_and_instructions, key=lambda x: self.pseudo_indices[x.name]
+            questions_and_instructions, key=lambda x: self._pseudo_indices[x.name]
         )
 
     # endregion
@@ -771,7 +852,7 @@ class Survey(SurveyExportMixin, SurveyFlowVisualizationMixin, Base):
 
         This takes the survey and adds an Agent and a Scenario via 'by' which converts to a Jobs object:
 
-        >>> s = Survey.example(); from edsl import Agent; from edsl import Scenario
+        >>> s = Survey.example(); from edsl.agents import Agent; from edsl import Scenario
         >>> s.by(Agent.example()).by(Scenario.example())
         Jobs(...)
         """
@@ -802,6 +883,7 @@ class Survey(SurveyExportMixin, SurveyFlowVisualizationMixin, Base):
         model=None,
         agent=None,
         cache=None,
+        verbose=False,
         disable_remote_cache: bool = False,
         disable_remote_inference: bool = False,
         **kwargs,
@@ -820,16 +902,18 @@ class Survey(SurveyExportMixin, SurveyFlowVisualizationMixin, Base):
 
         return self.get_job(model, agent, **kwargs).run(
             cache=cache,
+            verbose=verbose,
             disable_remote_cache=disable_remote_cache,
             disable_remote_inference=disable_remote_inference,
         )
 
     async def run_async(
         self,
-        model: Optional["Model"] = None,
+        model: Optional["LanguageModel"] = None,
         agent: Optional["Agent"] = None,
         cache: Optional["Cache"] = None,
         disable_remote_inference: bool = False,
+        disable_remote_cache: bool = False,
         **kwargs,
     ):
         """Run the survey with default model, taking the required survey as arguments.
@@ -839,7 +923,7 @@ class Survey(SurveyExportMixin, SurveyFlowVisualizationMixin, Base):
         >>> def f(scenario, agent_traits): return "yes" if scenario["period"] == "morning" else "no"
         >>> q = QuestionFunctional(question_name = "q0", func = f)
         >>> s = Survey([q])
-        >>> async def test_run_async(): result = await s.run_async(period="morning", disable_remote_inference = True); print(result.select("answer.q0").first())
+        >>> async def test_run_async(): result = await s.run_async(period="morning", disable_remote_inference = True, disable_remote_cache=True); print(result.select("answer.q0").first())
         >>> asyncio.run(test_run_async())
         yes
         >>> import asyncio
@@ -847,20 +931,23 @@ class Survey(SurveyExportMixin, SurveyFlowVisualizationMixin, Base):
         >>> def f(scenario, agent_traits): return "yes" if scenario["period"] == "morning" else "no"
         >>> q = QuestionFunctional(question_name = "q0", func = f)
         >>> s = Survey([q])
-        >>> async def test_run_async(): result = await s.run_async(period="evening", disable_remote_inference = True); print(result.select("answer.q0").first())
-        >>> asyncio.run(test_run_async())
+        >>> async def test_run_async(): result = await s.run_async(period="evening", disable_remote_inference = True, disable_remote_cache = True); print(result.select("answer.q0").first())
+        >>> results = asyncio.run(test_run_async())
         no
         """
         # TODO: temp fix by creating a cache
         if cache is None:
             from edsl.data import Cache
-
             c = Cache()
         else:
             c = cache
-        jobs: "Jobs" = self.get_job(model=model, agent=agent, **kwargs)
+
+        
+
+        jobs: "Jobs" = self.get_job(model=model, agent=agent, **kwargs).using(c)
         return await jobs.run_async(
-            cache=c, disable_remote_inference=disable_remote_inference
+            disable_remote_inference=disable_remote_inference,
+            disable_remote_cache=disable_remote_cache,
         )
 
     def run(self, *args, **kwargs) -> "Results":
@@ -878,9 +965,30 @@ class Survey(SurveyExportMixin, SurveyFlowVisualizationMixin, Base):
 
         return Jobs(survey=self).run(*args, **kwargs)
 
+    def using(self, obj: Union["Cache", "KeyLookup", "BucketCollection"]) -> "Jobs":
+        """Turn the survey into a Job and appends the arguments to the Job."""
+        from edsl.jobs.Jobs import Jobs
+
+        return Jobs(survey=self).using(obj)
+
+    def duplicate(self):
+        """Duplicate the survey.
+
+        >>> s = Survey.example()
+        >>> s2 = s.duplicate()
+        >>> s == s2
+        True
+        >>> s is s2
+        False
+
+        """
+        return Survey.from_dict(self.to_dict())
+
     # region: Survey flow
     def next_question(
-        self, current_question: Union[str, QuestionBase], answers: dict
+        self,
+        current_question: Optional[Union[str, QuestionBase]] = None,
+        answers: Optional[dict] = None,
     ) -> Union[QuestionBase, EndOfSurvey.__class__]:
         """
         Return the next question in a survey.
@@ -899,8 +1007,11 @@ class Survey(SurveyExportMixin, SurveyFlowVisualizationMixin, Base):
         'q1'
 
         """
+        if current_question is None:
+            return self.questions[0]
+
         if isinstance(current_question, str):
-            current_question = self.get_question(current_question)
+            current_question = self._get_question_by_name(current_question)
 
         question_index = self.question_name_to_index[current_question.question_name]
         next_question_object = self.rule_collection.next_question(
@@ -978,6 +1089,8 @@ class Survey(SurveyExportMixin, SurveyFlowVisualizationMixin, Base):
         {1: {0}, 2: {0}}
 
         """
+        from edsl.surveys.ConstructDAG import ConstructDAG
+
         return ConstructDAG(self).dag(textify)
 
     ###################
@@ -1007,18 +1120,18 @@ class Survey(SurveyExportMixin, SurveyFlowVisualizationMixin, Base):
         elif isinstance(index, str):
             return getattr(self, index)
 
-    def _diff(self, other):
-        """Used for debugging. Print out the differences between two surveys."""
-        from rich import print
+    # def _diff(self, other):
+    #     """Used for debugging. Print out the differences between two surveys."""
+    #     from rich import print
 
-        for key, value in self.to_dict().items():
-            if value != other.to_dict()[key]:
-                print(f"Key: {key}")
-                print("\n")
-                print(f"Self: {value}")
-                print("\n")
-                print(f"Other: {other.to_dict()[key]}")
-                print("\n\n")
+    #     for key, value in self.to_dict().items():
+    #         if value != other.to_dict()[key]:
+    #             print(f"Key: {key}")
+    #             print("\n")
+    #             print(f"Self: {value}")
+    #             print("\n")
+    #             print(f"Other: {other.to_dict()[key]}")
+    #             print("\n\n")
 
     def __repr__(self) -> str:
         """Return a string representation of the survey."""
@@ -1026,7 +1139,7 @@ class Survey(SurveyExportMixin, SurveyFlowVisualizationMixin, Base):
         # questions_string = ", ".join([repr(q) for q in self._questions])
         questions_string = ", ".join([repr(q) for q in self.raw_passed_questions or []])
         # question_names_string = ", ".join([repr(name) for name in self.question_names])
-        return f"Survey(questions=[{questions_string}], memory_plan={self.memory_plan}, rule_collection={self.rule_collection}, question_groups={self.question_groups})"
+        return f"Survey(questions=[{questions_string}], memory_plan={self.memory_plan}, rule_collection={self.rule_collection}, question_groups={self.question_groups}, questions_to_randomize={self.questions_to_randomize})"
 
     def _summary(self) -> dict:
         return {
@@ -1112,7 +1225,7 @@ class Survey(SurveyExportMixin, SurveyFlowVisualizationMixin, Base):
 
     def get_job(self, model=None, agent=None, **kwargs):
         if model is None:
-            from edsl import Model
+            from edsl.language_models.model import Model
 
             model = Model()
 
@@ -1121,7 +1234,7 @@ class Survey(SurveyExportMixin, SurveyFlowVisualizationMixin, Base):
         s = Scenario(kwargs)
 
         if not agent:
-            from edsl import Agent
+            from edsl.agents.Agent import Agent
 
             agent = Agent()
 
@@ -1133,26 +1246,24 @@ def main():
 
     def example_survey():
         """Return an example survey."""
-        from edsl.questions.QuestionMultipleChoice import QuestionMultipleChoice
-        from edsl.surveys.Survey import Survey
+        from edsl import QuestionMultipleChoice, QuestionList, QuestionNumerical, Survey
 
         q0 = QuestionMultipleChoice(
-            question_text="Do you like school?",
-            question_options=["yes", "no"],
             question_name="q0",
+            question_text="What is the capital of France?",
+            question_options=["London", "Paris", "Rome", "Boston", "I don't know"]
         )
-        q1 = QuestionMultipleChoice(
-            question_text="Why not?",
-            question_options=["killer bees in cafeteria", "other"],
+        q1 = QuestionList(
             question_name="q1",
+            question_text="Name some cities in France.",
+            max_list_items = 5
         )
-        q2 = QuestionMultipleChoice(
-            question_text="Why?",
-            question_options=["**lack*** of killer bees in cafeteria", "other"],
+        q2 = QuestionNumerical(
             question_name="q2",
+            question_text="What is the population of {{ q0.answer }}?"
         )
         s = Survey(questions=[q0, q1, q2])
-        s = s.add_rule(q0, "q0 == 'yes'", q2)
+        s = s.add_rule(q0, "q0 == 'Paris'", q2)
         return s
 
     s = example_survey()
